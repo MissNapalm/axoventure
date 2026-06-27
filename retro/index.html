@@ -42,7 +42,7 @@ const PIXEL_FONT_SM = '8px "Press Start 2P"';
 
 // Load sprites
 const sprites = {};
-const required = ['walk1', 'walk2', 'cap', 'capy2', 'jump'];
+const required = ['walk1', 'walk2', 'walk3', 'cap', 'capy2', 'jump'];
 let loaded = 0;
 
 for (const name of required) {
@@ -76,7 +76,7 @@ const player = {
   facingLeft: false,
   frame: 0,
   frameTimer: 0,
-  FRAME_INTERVAL: 10,
+  FRAME_INTERVAL: 7,
   moving: false,
 };
 
@@ -288,10 +288,11 @@ function update() {
 
   cameraX += ((player.x - VIEW_W / 2 + player.w / 2) - cameraX) * 0.12;
 
+  const walkSeq = ['walk1', 'walk2', 'walk3'];
   if (player.moving && player.onGround) {
     player.frameTimer++;
     const interval = run ? Math.round(player.FRAME_INTERVAL * 0.7) : player.FRAME_INTERVAL;
-    if (player.frameTimer >= interval) { player.frameTimer = 0; player.frame = 1 - player.frame; }
+    if (player.frameTimer >= interval) { player.frameTimer = 0; player.frame = (player.frame + 1) % walkSeq.length; }
   } else { player.frame = 0; player.frameTimer = 0; }
 }
 
@@ -388,11 +389,12 @@ function drawPlayer() {
   const bottom = Math.round(player.y + player.h);
   if (loaded < required.length) return;
 
+  const walkSeq = ['walk1', 'walk2', 'walk3'];
   const standingSprite = sprites['standing'].naturalWidth ? sprites['standing'] : sprites['walk1'];
   const sprite = !player.onGround
     ? sprites['jump']
     : player.moving
-      ? (player.frame === 0 ? sprites['walk1'] : sprites['walk2'])
+      ? sprites[walkSeq[player.frame]]
       : standingSprite;
 
   const sw = sprite.naturalWidth;
