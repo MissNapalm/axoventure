@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Axolotl Adventure</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a0a2e;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const SCALE = 3;
+const VIEW_W = 480;
+const VIEW_H = 270;
+canvas.width = VIEW_W;
+canvas.height = VIEW_H;
+canvas.style.width = VIEW_W * SCALE + 'px';
+canvas.style.height = VIEW_H * SCALE + 'px';
+ctx.imageSmoothingEnabled = false;
+
+const PIXEL_FONT = '8px "Press Start 2P"';
+const PIXEL_FONT_SM = '8px "Press Start 2P"';
+
+// Load sprites
+const sprites = {};
+const required = ['walk1', 'walk2', 'cap', 'capy2', 'jump'];
+let loaded = 0;
+
+for (const name of required) {
+  sprites[name] = new Image();
+  sprites[name].onload = () => { loaded++; };
+  sprites[name].src = name + '.png';
+}
+
+sprites['standing'] = new Image();
+sprites['standing'].src = 'standing.png';
+
+const settings = {
+  gravity:      { value: 0.32,  min: 0.05, max: 1.0,  step: 0.01, label: 'Gravity' },
+  jumpForce:    { value: 6.0,   min: 1.0,  max: 15.0, step: 0.1,  label: 'Jump Height' },
+  walkSpeed:    { value: 1.8,   min: 0.5,  max: 6.0,  step: 0.1,  label: 'Walk Speed' },
+  runMult:      { value: 2.2,   min: 1.0,  max: 5.0,  step: 0.1,  label: 'Run Multiplier' },
+  jumpYOffset:  { value: 20,    min: -30,  max: 30,   step: 1,    label: 'Jump Y Offset' },
+};
+const S = new Proxy(settings, { get: (t, k) => t[k].value });
+
+let settingsOpen = false;
+
+const player = {
+  x: 60,
+  y: 170,
+  w: 48,
+  h: 26,
+  vx: 0,
+  vy: 0,
+  onGround: false,
+  facingLeft: false,
+  frame: 0,
+  frameTimer: 0,
+  FRAME_INTERVAL: 10,
+  moving: false,
+};
+
+const TALK_DISTANCE = 60;
+const GROUND_Y = 210;
+
+const npcs = [
+  {
+    name: 'Edgar',
+    sprite: 'cap',
+    x: 1380, w: 43, h: 44,
+    flipX: false,
+    get y() { return GROUND_Y - this.h; },
+    lines: [
+      "Axo? You're up late.",
+      "I come here at night\nsometimes to think...",
+      "Sometimes things can be\nso overwhelming, and it\nhelps to be alone.",
+      "Don't you think?",
+    ],
+  },
+  {
+    name: 'Enrique',
+    sprite: 'capy2',
+    x: 1560, w: 43, h: 44,
+    flipX: true,
+    get y() { return GROUND_Y - this.h; },
+    lines: [
+      "Things in this world are so fleeting.",
+      "The things you love can go away so fast.\nIt's best to never get too attached.",
+      "I don't like endings...",
+      "But I do like the rain...",
+    ],
+  },
+];
+
+const dialog = {
+  active: false,
+  npc: null,
+  page: 0,
+  chars: 0,       // how many chars revealed so far
+  charTimer: 0,
+  CHAR_INTERVAL: 2, // frames per character
+  get fullText() { return this.npc ? this.npc.lines[this.page] : ''; },
+  get done() { return this.chars >= this.fullText.length; },
+};
+
+const platforms = [
+  { x: -200, y: 210, w: 2200, h: 60, color: '#3d2b1f' },
+  { x: 80,  y: 175, w: 80,  h: 8, color: '#5c3d2e', oneWay: true },
+  { x: 230, y: 155, w: 80,  h: 8, color: '#5c3d2e', oneWay: true },
+  { x: 370, y: 135, w: 70,  h: 8, color: '#5c3d2e', oneWay: true },
+  { x: 500, y: 165, w: 90,  h: 8, color: '#5c3d2e', oneWay: true },
+  { x: 650, y: 140, w: 75,  h: 8, color: '#5c3d2e', oneWay: true },
+  { x: 790, y: 115, w: 70,  h: 8, color: '#5c3d2e', oneWay: true },
+  { x: 920, y: 148, w: 80,  h: 8, color: '#5c3d2e', oneWay: true },
+  { x: 1060,y: 125, w: 75,  h: 8, color: '#5c3d2e', oneWay: true },
+  { x: 1200,y: 155, w: 80,  h: 8, color: '#5c3d2e', oneWay: true },
+  { x: 1340,y: 130, w: 90,  h: 8, color: '#5c3d2e', oneWay: true },
+  { x: 470, y: 185, w: 22,  h: 25, color: '#4a2f22' },
+  { x: 760, y: 180, w: 22,  h: 30, color: '#4a2f22' },
+  { x: 1000,y: 175, w: 22,  h: 35, color: '#4a2f22' },
+];
+
+const keys = {};
+const keysConsumed = {};
+window.addEventListener('keydown', e => {
+  if (e.code === 'Tab') { e.preventDefault(); settingsOpen = !settingsOpen; return; }
+  if (!keys[e.code]) keysConsumed[e.code] = false;
+  keys[e.code] = true;
+  if (e.code === 'KeyM') e.preventDefault();
+});
+window.addEventListener('keyup', e => {
+  keys[e.code] = false;
+  keysConsumed[e.code] = false;
+});
+
+function consumeKey(code) {
+  if (keys[code] && !keysConsumed[code]) {
+    keysConsumed[code] = true;
+    return true;
+  }
+  return false;
+}
+
+const stars = Array.from({ length: 80 }, () => ({
+  x: Math.random() * 2200,
+  y: Math.random() * VIEW_H * 0.75,
+  r: Math.random() < 0.3 ? 1.5 : 1,
+  speed: Math.random() * 0.2 + 0.05,
+}));
+
+const clouds = Array.from({ length: 10 }, () => ({
+  x: Math.random() * 2200,
+  y: Math.random() * 80 + 20,
+  w: Math.random() * 60 + 30,
+  speed: Math.random() * 0.15 + 0.05,
+}));
+
+let cameraX = 0;
+
+// Rain — pixel-snapped drops, fixed screen-space so they don't scroll with camera
+const raindrops = Array.from({ length: 60 }, () => ({
+  x: Math.floor(Math.random() * VIEW_W),
+  y: Math.floor(Math.random() * VIEW_H),
+  len: Math.floor(Math.random() * 3) + 2, // 2–4px
+  speed: Math.floor(Math.random() * 2) + 2, // 2–3px/frame
+}));
+
+function resolveCollisions() {
+  player.onGround = false;
+  for (const p of platforms) {
+    const ox = Math.min(player.x + player.w, p.x + p.w) - Math.max(player.x, p.x);
+    const oy = Math.min(player.y + player.h, p.y + p.h) - Math.max(player.y, p.y);
+    if (ox <= 0 || oy <= 0) continue;
+
+    if (p.oneWay) {
+      // only land on top — player must be coming down and feet were above platform top last frame
+      const prevBottom = player.y + player.h - player.vy;
+      if (player.vy >= 0 && prevBottom <= p.y + 1) {
+        player.y -= oy;
+        player.vy = 0;
+        player.onGround = true;
+      }
+    } else {
+      if (ox < oy) {
+        if (player.x < p.x) player.x -= ox; else player.x += ox;
+        player.vx = 0;
+      } else {
+        if (player.y < p.y) { player.y -= oy; player.vy = 0; player.onGround = true; }
+        else { player.y += oy; player.vy = 0; }
+      }
+    }
+  }
+}
+
+function nearNpc() {
+  const playerCx = player.x + player.w / 2;
+  return npcs.find(n => Math.abs(playerCx - (n.x + n.w / 2)) < TALK_DISTANCE) || null;
+}
+
+function update() {
+  if (consumeKey('KeyM')) {
+    const nearby = nearNpc();
+    if (!dialog.active && nearby) {
+      dialog.active = true;
+      dialog.npc = nearby;
+      dialog.page = 0;
+      dialog.chars = 0;
+      dialog.charTimer = 0;
+    } else if (dialog.active && dialog.done) {
+      dialog.page++;
+      if (dialog.page >= dialog.npc.lines.length) { dialog.active = false; dialog.npc = null; }
+      else { dialog.chars = 0; dialog.charTimer = 0; }
+    }
+  }
+
+  // L skips typewriter to end; if already done, advances page
+  if (consumeKey('KeyL')) {
+    if (dialog.active) {
+      if (!dialog.done) {
+        dialog.chars = dialog.fullText.length;
+      } else {
+        dialog.page++;
+        if (dialog.page >= dialog.npc.lines.length) { dialog.active = false; dialog.npc = null; }
+        else { dialog.chars = 0; dialog.charTimer = 0; }
+      }
+    }
+  }
+
+  if (dialog.active) {
+    // advance typewriter
+    if (!dialog.done) {
+      dialog.charTimer++;
+      if (dialog.charTimer >= dialog.CHAR_INTERVAL) {
+        dialog.charTimer = 0;
+        dialog.chars++;
+      }
+    }
+
+    player.vx = 0;
+    player.moving = false;
+    if (!player.onGround) {
+      player.vy += S.gravity;
+      player.y += player.vy;
+      resolveCollisions();
+    } else {
+      player.vy = 0;
+    }
+    return;
+  }
+
+  const left  = keys['KeyS'];
+  const right = keys['KeyC'];
+  const jump  = keys['KeyD'] || keys['KeyL'];
+  const run   = keys['KeyM'];
+  const speed = run ? S.walkSpeed * S.runMult : S.walkSpeed;
+
+  player.moving = false;
+  if (left) { player.vx = -speed; player.facingLeft = true; player.moving = true; }
+  else if (right) { player.vx = speed; player.facingLeft = false; player.moving = true; }
+  else { player.vx *= 0.7; }
+
+  if (jump && player.onGround) { player.vy = -S.jumpForce; player.onGround = false; }
+
+  player.vy += S.gravity;
+  player.x += player.vx;
+  player.y += player.vy;
+  resolveCollisions();
+
+  cameraX += ((player.x - VIEW_W / 2 + player.w / 2) - cameraX) * 0.12;
+
+  if (player.moving && player.onGround) {
+    player.frameTimer++;
+    const interval = run ? Math.round(player.FRAME_INTERVAL * 0.7) : player.FRAME_INTERVAL;
+    if (player.frameTimer >= interval) { player.frameTimer = 0; player.frame = 1 - player.frame; }
+  } else { player.frame = 0; player.frameTimer = 0; }
+}
+
+function drawBg() {
+  const grad = ctx.createLinearGradient(0, 0, 0, VIEW_H);
+  grad.addColorStop(0, '#0d0521');
+  grad.addColorStop(1, '#1a0a3e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  ctx.fillStyle = '#fff';
+  for (const s of stars) {
+    const sx = ((s.x - cameraX * s.speed) % 2200 + 2200) % 2200;
+    ctx.globalAlpha = 0.7 + Math.sin(Date.now() * 0.001 + s.x) * 0.3;
+    ctx.beginPath(); ctx.arc(sx, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.fillStyle = '#2d1060';
+  for (const c of clouds) {
+    const cx = ((c.x - cameraX * c.speed) % 2200 + 2200) % 2200;
+    ctx.beginPath(); ctx.ellipse(cx, c.y, c.w, 10, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx - c.w * 0.3, c.y + 4, c.w * 0.6, 8, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(cx + c.w * 0.3, c.y + 4, c.w * 0.5, 7, 0, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function drawRain() {
+  ctx.save();
+  for (const d of raindrops) {
+    d.y += d.speed;
+    d.x -= 1; // slight angle
+    if (d.y > VIEW_H) { d.y = -d.len; d.x = Math.floor(Math.random() * VIEW_W); }
+    if (d.x < 0) d.x += VIEW_W;
+
+    // pixel-snap
+    const x = Math.floor(d.x);
+    const y = Math.floor(d.y);
+
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = '#a0c4ff';
+    ctx.fillRect(x, y, 1, d.len);
+    // slightly brighter head pixel
+    ctx.globalAlpha = 0.28;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
+function drawPlatforms() {
+  for (const p of platforms) {
+    const sx = p.x - cameraX;
+    ctx.fillStyle = '#7a5544'; ctx.fillRect(sx, p.y, p.w, 3);
+    ctx.fillStyle = p.color;  ctx.fillRect(sx, p.y + 3, p.w, p.h - 3);
+    if (p.h <= 10) {
+      ctx.fillStyle = '#5c8a3c';
+      for (let gx = sx + 4; gx < sx + p.w - 4; gx += 8) ctx.fillRect(gx, p.y, 2, 3);
+    }
+  }
+}
+
+function drawNpcs() {
+  const playerCx = player.x + player.w / 2;
+  for (const npc of npcs) {
+    if (!sprites[npc.sprite].naturalWidth) continue;
+    const sx = Math.round(npc.x - cameraX);
+    const sy = Math.round(npc.y);
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    if (npc.flipX) {
+      ctx.scale(-1, 1);
+      ctx.drawImage(sprites[npc.sprite], -(sx + npc.w), sy, npc.w, npc.h);
+    } else {
+      ctx.drawImage(sprites[npc.sprite], sx, sy, npc.w, npc.h);
+    }
+    ctx.restore();
+
+    const nearby = Math.abs(playerCx - (npc.x + npc.w / 2)) < TALK_DISTANCE;
+    if (nearby && !dialog.active) {
+      ctx.font = PIXEL_FONT_SM;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillStyle = '#f8b4d9';
+      ctx.fillText('[M] Talk', Math.round(sx + npc.w / 2), sy - 3);
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+    }
+  }
+}
+
+function drawPlayer() {
+  const px = Math.round(player.x - cameraX);
+  const bottom = Math.round(player.y + player.h);
+  if (loaded < required.length) return;
+
+  const standingSprite = sprites['standing'].naturalWidth ? sprites['standing'] : sprites['walk1'];
+  const sprite = !player.onGround
+    ? sprites['jump']
+    : player.moving
+      ? (player.frame === 0 ? sprites['walk1'] : sprites['walk2'])
+      : standingSprite;
+
+  const sw = sprite.naturalWidth;
+  const sh = sprite.naturalHeight;
+  const yOffset = !player.onGround ? S.jumpYOffset : 0;
+  const py = bottom - sh + yOffset;
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  if (!player.facingLeft) {
+    ctx.scale(-1, 1);
+    ctx.drawImage(sprite, -(px + sw), py, sw, sh);
+  } else {
+    ctx.drawImage(sprite, px, py, sw, sh);
+  }
+  ctx.restore();
+}
+
+// Zelda-OOT-style compact dialog box
+function drawDialog() {
+  if (!dialog.active) return;
+
+  const PAD = 10;
+  const lineH = 14;
+  const nameH = 8;   // actual pixel height of 8px font
+  const dividerGap = 6;
+  const textGap = 9;
+
+  const npc = dialog.npc;
+  ctx.font = PIXEL_FONT;
+  ctx.textBaseline = 'top';
+  const fullLines = npc.lines[dialog.page].split('\n');
+
+  // size box using full text so it never resizes mid-typewriter
+  const maxLineW = Math.max(
+    ctx.measureText(npc.name).width,
+    ...fullLines.map(l => ctx.measureText(l).width)
+  );
+  const BOX_W = Math.ceil(maxLineW) + PAD * 2;
+  const BOX_H = PAD + nameH + dividerGap + fullLines.length * lineH + PAD;
+  const BOX_X = Math.round((VIEW_W - BOX_W) / 2);
+  const BOX_Y = 68;
+
+  // dark fill
+  ctx.fillStyle = 'rgba(8,3,24,0.92)';
+  ctx.fillRect(BOX_X, BOX_Y, BOX_W, BOX_H);
+
+  // border — double pixel like OOT
+  ctx.strokeStyle = '#7a50cc';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(BOX_X + 1, BOX_Y + 1, BOX_W - 2, BOX_H - 2);
+  ctx.strokeStyle = '#4a2888';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(BOX_X + 3, BOX_Y + 3, BOX_W - 6, BOX_H - 6);
+
+  // name
+  ctx.fillStyle = '#c9a0ff';
+  ctx.fillText(npc.name, BOX_X + PAD, BOX_Y + PAD);
+
+  // divider
+  const dividerY = BOX_Y + PAD + nameH + 5;
+  ctx.fillStyle = '#4a2888';
+  ctx.fillRect(BOX_X + PAD, dividerY, BOX_W - PAD * 2, 1);
+
+  // typewriter: slice revealed chars across lines
+  ctx.fillStyle = '#f0e6ff';
+  const textStartY = dividerY + textGap;
+  let charsLeft = dialog.chars;
+  fullLines.forEach((line, i) => {
+    const visible = line.slice(0, charsLeft);
+    if (visible.length > 0) ctx.fillText(visible, BOX_X + PAD, textStartY + i * lineH);
+    charsLeft = Math.max(0, charsLeft - line.length);
+  });
+
+  // blinking arrow only when typewriter is done
+  if (dialog.done && Math.floor(Date.now() / 400) % 2 === 0) {
+    ctx.fillStyle = '#b07aff';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('▼', BOX_X + BOX_W - PAD, BOX_Y + BOX_H - 3);
+  }
+
+  ctx.textBaseline = 'alphabetic';
+}
+
+// Settings panel
+const settingsKeys = Object.keys(settings);
+let dragging = null; // { key, trackX, trackW }
+
+function settingsPanelRect() {
+  const W = 160, ROW = 22, PAD = 8;
+  const H = PAD + 14 + settingsKeys.length * ROW + PAD;
+  return { x: VIEW_W - W - 6, y: 6, w: W, h: H, pad: PAD, row: ROW };
+}
+
+canvas.addEventListener('mousedown', e => {
+  if (!settingsOpen) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) / SCALE;
+  const my = (e.clientY - rect.top) / SCALE;
+  const { x, y, w, pad, row } = settingsPanelRect();
+  settingsKeys.forEach((key, i) => {
+    const trackX = x + pad;
+    const trackW = w - pad * 2;
+    const trackY = y + pad + 14 + i * row + 12;
+    if (my >= trackY - 3 && my <= trackY + 5 && mx >= trackX && mx <= trackX + trackW) {
+      dragging = { key, trackX, trackW };
+      applyDrag(mx);
+    }
+  });
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const rect = canvas.getBoundingClientRect();
+  applyDrag((e.clientX - rect.left) / SCALE);
+});
+
+canvas.addEventListener('mouseup', () => { dragging = null; });
+
+function applyDrag(mx) {
+  const s = settings[dragging.key];
+  const t = Math.max(0, Math.min(1, (mx - dragging.trackX) / dragging.trackW));
+  s.value = Math.round((s.min + t * (s.max - s.min)) / s.step) * s.step;
+  s.value = Math.round(s.value * 1000) / 1000;
+}
+
+function drawSettings() {
+  if (!settingsOpen) return;
+  const { x, y, w, h, pad, row } = settingsPanelRect();
+
+  ctx.fillStyle = 'rgba(8,3,24,0.95)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = '#7a50cc';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+  ctx.strokeStyle = '#4a2888';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 3, y + 3, w - 6, h - 6);
+
+  ctx.font = PIXEL_FONT;
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#c9a0ff';
+  ctx.fillText('Settings', x + pad, y + pad);
+
+  settingsKeys.forEach((key, i) => {
+    const s = settings[key];
+    const ry = y + pad + 14 + i * row;
+    const trackX = x + pad;
+    const trackW = w - pad * 2;
+    const t = (s.value - s.min) / (s.max - s.min);
+
+    // label + value
+    ctx.fillStyle = '#f0e6ff';
+    ctx.font = '6px "Press Start 2P"';
+    ctx.fillText(s.label, trackX, ry);
+    ctx.textAlign = 'right';
+    ctx.fillText(String(Math.round(s.value * 100) / 100), x + w - pad, ry);
+    ctx.textAlign = 'left';
+
+    // track
+    ctx.fillStyle = '#2a1555';
+    ctx.fillRect(trackX, ry + 11, trackW, 3);
+    // fill
+    ctx.fillStyle = '#7a50cc';
+    ctx.fillRect(trackX, ry + 11, Math.round(t * trackW), 3);
+    // thumb
+    ctx.fillStyle = '#f0e6ff';
+    ctx.fillRect(trackX + Math.round(t * trackW) - 1, ry + 9, 3, 7);
+  });
+
+  ctx.textBaseline = 'alphabetic';
+
+  // Tab hint
+  ctx.font = '6px "Press Start 2P"';
+  ctx.fillStyle = '#4a2888';
+  ctx.textAlign = 'right';
+  ctx.fillText('[Tab] close', x + w - pad, y + h - pad + 6);
+  ctx.textAlign = 'left';
+}
+
+function drawHUD() {
+  ctx.font = PIXEL_FONT_SM;
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(4, 4, 260, 12);
+  ctx.fillStyle = '#f8b4d9';
+  ctx.fillText('S/C move  D/L jump  M run  Tab settings', 6, 13);
+}
+
+function loop() {
+  update();
+  ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+  drawBg();
+  drawRain();
+  drawPlatforms();
+  drawNpcs();
+  drawPlayer();
+  drawDialog();
+  drawSettings();
+  drawHUD();
+  requestAnimationFrame(loop);
+}
+
+// Wait for pixel font + sprites
+function waitAndStart() {
+  if (loaded >= required.length) {
+    player.w = sprites['walk1'].naturalWidth;
+    player.h = sprites['walk1'].naturalHeight;
+    // ensure font is loaded before first draw
+    document.fonts.ready.then(() => loop());
+  } else {
+    setTimeout(waitAndStart, 50);
+  }
+}
+waitAndStart();
+</script>
+</body>
+</html>
