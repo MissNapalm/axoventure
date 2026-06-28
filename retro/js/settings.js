@@ -18,6 +18,7 @@ const settings = {
   throwStrength:{ value: 2.5,   min: 1,    max: 20,   step: 0.5,  label: 'Throw Strength' },
   redBounceBack:{ value: 4,     min: 0,    max: 20,   step: 0.5,  label: 'Axo Knockback' },
   redFlipGrav:  { value: 0.49,  min: 0.01, max: 2.0,  step: 0.01, label: 'Red Flip Grav' },
+  homingHover:  { value: 12,    min: 0,    max: 60,   step: 1,    label: 'Homing Hover' },
 };
 
 // S.gravity instead of settings.gravity.value

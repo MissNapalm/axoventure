@@ -154,8 +154,21 @@ function updatePlayer() {
     if (player.groundDashTimer <= 0) { player.groundDashing = false; player.vx *= 0.3; }
   }
 
+  // Homing windup hover → launch
+  if (player.homingWindup > 0) {
+    player.homingWindup--;
+    player.vx = 0; player.vy = 0;
+    if (player.homingWindup === 0 && player.homingWindupTarget && !player.homingWindupTarget.dead) {
+      player.dashing = true;
+      player.dashTarget = player.homingWindupTarget;
+      player.homingWindupTarget = null;
+    } else if (player.homingWindup === 0) {
+      player.homingWindupTarget = null;
+    }
+  }
+
   // Homing attack: one per jump, triggered by fresh jump press while airborne
-  if (!player.onGround && !player.dashing && !player.homingUsed && jumpPressed && !player.wasOnGround) {
+  if (!player.onGround && !player.dashing && !player.homingUsed && player.homingWindup === 0 && jumpPressed && !player.wasOnGround) {
     const pcx = player.x + player.w / 2;
     const pcy = player.y + player.h / 2;
     let best = null, bestDist = HOMING_RANGE;
@@ -165,7 +178,11 @@ function updatePlayer() {
       const dist = Math.hypot((e.x + e.w / 2) - pcx, ey - pcy);
       if (dist < bestDist) { bestDist = dist; best = e; }
     }
-    if (best) { player.dashing = true; player.dashTarget = best; player.homingUsed = true; }
+    if (best) {
+      player.homingWindup = S.homingHover;
+      player.homingWindupTarget = best;
+      player.homingUsed = true;
+    }
   }
 
   if (player.dashing && player.dashTarget) {
@@ -190,7 +207,7 @@ function updatePlayer() {
   for (const t of player.trail) t.life--;
   player.trail = player.trail.filter(t => t.life > 0);
 
-  if (!player.dashing && !player.groundDashing) player.vy += S.gravity;
+  if (!player.dashing && !player.groundDashing && player.homingWindup === 0) player.vy += S.gravity;
   player.x += player.vx;
   player.y += player.vy;
 
@@ -342,14 +359,14 @@ function drawPlayer() {
 
   // build tinted sprite on offscreen canvas
   let drawSpr = sprite;
-  if (player.dashing || player.groundDashing || player.hurtTimer > 0) {
+  if (player.dashing || player.groundDashing || player.homingWindup > 0 || player.hurtTimer > 0) {
     const oc = document.createElement('canvas');
     oc.width = sw; oc.height = sh;
     const oc2d = oc.getContext('2d');
     oc2d.imageSmoothingEnabled = false;
     oc2d.drawImage(sprite, 0, 0, sw, sh);
     oc2d.globalCompositeOperation = 'source-atop';
-    oc2d.fillStyle = (player.hurtTimer > 0 && !player.dashing) ? 'rgba(255,0,0,0.55)' : 'rgba(255,255,255,0.9)';
+    oc2d.fillStyle = (player.hurtTimer > 0 && !player.dashing && !player.homingWindup) ? 'rgba(255,0,0,0.55)' : 'rgba(255,255,255,0.9)';
     oc2d.fillRect(0, 0, sw, sh);
     drawSpr = oc;
   }
@@ -379,6 +396,21 @@ function drawPlayer() {
   }
 
   ctx.restore();
+
+  // hover ring: pulses while locked on pre-launch
+  if (player.homingWindup > 0 && S.homingHover > 0) {
+    const t = 1 - player.homingWindup / S.homingHover;
+    const wcx = Math.round(player.x + player.w / 2 - cameraX);
+    const wcy = Math.round(player.y + player.h / 2 - cameraY);
+    ctx.save();
+    ctx.globalAlpha = 0.9 - t * 0.5;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(wcx, wcy, 6 + t * 14, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // shockwave rings expanding outward from impact
   for (let i = player.shockwaves.length - 1; i >= 0; i--) {
