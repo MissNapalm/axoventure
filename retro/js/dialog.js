@@ -83,7 +83,7 @@ function drawDialog() {
   const maxLineW = wrappedLines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
   const contentW = Math.max(nameW, maxLineW);
   const BOX_W = Math.ceil(contentW) + PAD * 2 + 8;
-  const BOX_X = 8;
+  const BOX_X = Math.round((VIEW_W - BOX_W) / 2);
   const BOX_Y = 68;
   const BOX_H = PAD + nameH + dividerGap + wrappedLines.length * lineH + PAD;
 
