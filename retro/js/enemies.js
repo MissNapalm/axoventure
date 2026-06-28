@@ -26,6 +26,7 @@ function makeEnemy(x, patrolLeft, patrolRight, platformY) {
     stunTimer: 0,
     hitFlash: 0,
     hitTextTimer: 0,
+    deathFlash: 0,
     frame: 0, frameTimer: 0,
     dead: false,
     respawnTimer: 0,
@@ -319,38 +320,35 @@ function spawnDeathStars(e) {
   const cx = e.x + e.w / 2;
   const cy = (e._y ? e._y : e.y) + e.h / 2;
 
-  // expanding white circle
-  e.particles.push({ kind: 'circle', x: cx, y: cy, r: 2, life: 18, maxLife: 18, speed: 8 });
-
-  // fast white/yellow pixel chunks
-  for (let i = 0; i < 28; i++) {
-    const angle = (i / 28) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-    const speed = 3 + Math.random() * 6;
+  // dense fast white burst
+  for (let i = 0; i < 40; i++) {
+    const angle = (i / 40) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
+    const speed = 3 + Math.random() * 7;
     e.particles.push({
       x: cx, y: cy,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 1.5,
-      life: 12 + Math.floor(Math.random() * 10),
+      vy: Math.sin(angle) * speed - 2,
+      life: 10 + Math.floor(Math.random() * 12),
       maxLife: 22,
-      size: Math.random() < 0.5 ? 3 : 2,
-      color: Math.random() < 0.6 ? '#ffffff' : '#ffff88',
-      gravity: 0.2,
+      size: Math.random() < 0.5 ? 4 : 2,
+      color: '#ffffff',
+      gravity: 0.22,
     });
   }
 
-  // slower cyan debris
-  for (let i = 0; i < 12; i++) {
-    const angle = (i / 12) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
-    const speed = 1.5 + Math.random() * 3;
+  // secondary looser white cloud
+  for (let i = 0; i < 20; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 4;
     e.particles.push({
       x: cx, y: cy,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 0.5,
-      life: 18 + Math.floor(Math.random() * 10),
+      life: 16 + Math.floor(Math.random() * 12),
       maxLife: 28,
       size: 2,
-      color: '#80e0ff',
-      gravity: 0.1,
+      color: '#ffffff',
+      gravity: 0.08,
     });
   }
 }
@@ -361,6 +359,7 @@ function hitEnemy(e) {
   e.hitTextTimer = 40;
   e.vx = (e.x + e.w / 2 > player.x + player.w / 2) ? 4 : -4;
   if (e.hp <= 0) {
+    e.deathFlash = 5;
     e.dead = true;
     spawnDeathStars(e);
     triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
@@ -376,6 +375,7 @@ function updateEnemies() {
     e.particles = e.particles.filter(p => p.life > 0);
 
     if (e.hitTextTimer > 0) e.hitTextTimer--;
+    if (e.deathFlash > 0) e.deathFlash--;
     if (e.dead) {
       const distToPlayer = Math.abs((e.startX + e.w / 2) - (player.x + player.w / 2));
       if (distToPlayer > VIEW_W) {
@@ -452,24 +452,26 @@ function drawEnemies() {
   for (const e of enemies) {
     drawParticles(e.particles);
 
-    if (e.dead || e.w === 0) continue;
+    if (e.w === 0) continue;
+    if (e.dead && e.deathFlash <= 0) continue;
     const sx = Math.round(e.x - cameraX);
     const sy = Math.round(e.y - cameraY);
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
 
-    const spr = (e.stunTimer > 0 || e.shakeTimer > 0)
-      ? sprites[e.stunTimer > 0 ? 'badguy3' : (e.frame === 0 ? 'badguy1' : 'badguy2')]
-      : sprites[e.frame === 0 ? 'badguy1' : 'badguy2'];
+    const spr = e.deathFlash > 0
+      ? sprites[e.frame === 0 ? 'badguy1' : 'badguy2']
+      : (e.stunTimer > 0 || e.shakeTimer > 0)
+        ? sprites[e.stunTimer > 0 ? 'badguy3' : (e.frame === 0 ? 'badguy1' : 'badguy2')]
+        : sprites[e.frame === 0 ? 'badguy1' : 'badguy2'];
 
     // shake offset
     const shakeX = e.shakeTimer > 0 ? (Math.floor(e.shakeTimer / 3) % 2 === 0 ? 2 : -2) : 0;
 
     let drawX = sx + shakeX;
 
-    if (e.hitFlash > 0) {
-      // draw to offscreen canvas, fill white source-atop, then draw result
+    if (e.hitFlash > 0 || e.deathFlash > 0) {
       const oc = document.createElement('canvas');
       oc.width = e.w; oc.height = e.h;
       const oc2d = oc.getContext('2d');
@@ -481,7 +483,7 @@ function drawEnemies() {
         oc2d.drawImage(spr, 0, 0, e.w, e.h);
       }
       oc2d.globalCompositeOperation = 'source-atop';
-      oc2d.fillStyle = `rgba(255,255,255,${e.hitFlash / HIT_FLASH_FRAMES})`;
+      oc2d.fillStyle = e.deathFlash > 0 ? 'rgba(255,255,255,1)' : `rgba(255,255,255,${e.hitFlash / HIT_FLASH_FRAMES})`;
       oc2d.fillRect(0, 0, e.w, e.h);
       ctx.drawImage(oc, drawX, sy);
     } else if (e.vx > 0) {
