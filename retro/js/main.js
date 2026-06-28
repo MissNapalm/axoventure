@@ -48,16 +48,18 @@ function loop() {
       ctx.save();
       ctx.imageSmoothingEnabled = false;
       // white tint like a death flash
-      const oc = document.createElement('canvas');
-      oc.width = spr.naturalWidth; oc.height = spr.naturalHeight;
-      const oc2d = oc.getContext('2d');
+      const oc = getOC('death_flash', spr.naturalWidth, spr.naturalHeight);
+      const oc2d = oc._ctx;
+      oc2d.clearRect(0, 0, oc.width, oc.height);
+      oc2d.globalCompositeOperation = 'source-over';
+      oc2d.globalAlpha = 1;
       oc2d.imageSmoothingEnabled = false;
       oc2d.drawImage(spr, 0, 0);
       if (death.timer < death.freezeEnd) {
-        // flash white during freeze
         oc2d.globalCompositeOperation = 'source-atop';
         oc2d.fillStyle = `rgba(255,255,255,${0.8 - (death.timer / death.freezeEnd) * 0.8})`;
         oc2d.fillRect(0, 0, oc.width, oc.height);
+        oc2d.globalCompositeOperation = 'source-over';
       }
       ctx.drawImage(oc, sx, sy);
       ctx.restore();

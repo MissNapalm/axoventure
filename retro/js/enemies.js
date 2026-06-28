@@ -1,15 +1,4 @@
-// Tint a sprite with a color, return offscreen canvas
-function tintSprite(spr, color) {
-  const oc = document.createElement('canvas');
-  oc.width = spr.naturalWidth; oc.height = spr.naturalHeight;
-  const c = oc.getContext('2d');
-  c.imageSmoothingEnabled = false;
-  c.drawImage(spr, 0, 0);
-  c.globalCompositeOperation = 'source-atop';
-  c.fillStyle = color;
-  c.fillRect(0, 0, oc.width, oc.height);
-  return oc;
-}
+// tintSprite is defined in tint.js
 
 // platforms[1]=y175, [2]=y155, [3]=y135  (oneWay platforms near the start)
 function makeEnemy(x, patrolLeft, patrolRight, platformY) {
@@ -494,10 +483,9 @@ function drawFish() {
     set(15, 4, eye); set(16, 4, eye);
     set(15, 3, pupil);
 
-    // create offscreen canvas from pixel data
-    const oc = document.createElement('canvas');
-    oc.width = e.w; oc.height = e.h;
-    oc.getContext('2d').putImageData(d, 0, 0);
+    // reuse shared fish canvas (all fish are same size)
+    const oc = getOC('fish_px', e.w, e.h);
+    oc._ctx.putImageData(d, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(oc, -e.w / 2, -e.h / 2, e.w, e.h);
 
@@ -788,15 +776,16 @@ function drawBigFish() {
       }
     }
     // hitFlash tint overlay
-    const oc2 = document.createElement('canvas');
-    oc2.width = W; oc2.height = H;
-    const oc2d = oc2.getContext('2d');
+    const oc2 = getOC('bigfish_px', W, H);
+    const oc2d = oc2._ctx;
     oc2d.putImageData(d, 0, 0);
     if (e.hitFlash > 0 && !flash) {
       oc2d.globalCompositeOperation = 'source-atop';
       oc2d.globalAlpha = e.hitFlash / HIT_FLASH_FRAMES * 0.8;
       oc2d.fillStyle = '#ffffff';
       oc2d.fillRect(0, 0, W, H);
+      oc2d.globalCompositeOperation = 'source-over';
+      oc2d.globalAlpha = 1;
     }
     ctx.drawImage(oc2, -W/2, -H/2, W, H);
 
@@ -985,19 +974,23 @@ function drawEnemies() {
     let drawX = sx + shakeX;
 
     if (e.hitFlash > 0 || e.deathFlash > 0) {
-      const oc = document.createElement('canvas');
-      oc.width = e.w; oc.height = e.h;
-      const oc2d = oc.getContext('2d');
+      const oc = getOC('enemy_flash', e.w, e.h);
+      const oc2d = oc._ctx;
+      oc2d.clearRect(0, 0, e.w, e.h);
+      oc2d.globalCompositeOperation = 'source-over';
+      oc2d.globalAlpha = 1;
       oc2d.imageSmoothingEnabled = false;
       if (e.vx > 0) {
-        oc2d.scale(-1, 1);
+        oc2d.save(); oc2d.scale(-1, 1);
         oc2d.drawImage(spr, -e.w, 0, e.w, e.h);
+        oc2d.restore();
       } else {
         oc2d.drawImage(spr, 0, 0, e.w, e.h);
       }
       oc2d.globalCompositeOperation = 'source-atop';
       oc2d.fillStyle = e.deathFlash > 0 ? 'rgba(255,255,255,1)' : `rgba(255,255,255,${e.hitFlash / HIT_FLASH_FRAMES})`;
       oc2d.fillRect(0, 0, e.w, e.h);
+      oc2d.globalCompositeOperation = 'source-over';
       ctx.drawImage(oc, drawX, sy);
     } else if (e.vx > 0) {
       ctx.scale(-1, 1);

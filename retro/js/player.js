@@ -590,17 +590,20 @@ function drawPlayer() {
   // flicker during invincibility
   if (player.hurtTimer > 0 && Math.floor(player.hurtTimer / 4) % 2 === 0) return;
 
-  // build tinted sprite on offscreen canvas
+  // build tinted sprite on persistent offscreen canvas
   let drawSpr = sprite;
   if (player.dashing || player.groundDashing || player.homingWindup > 0 || player.hurtTimer > 0) {
-    const oc = document.createElement('canvas');
-    oc.width = sw; oc.height = sh;
-    const oc2d = oc.getContext('2d');
+    const oc = getOC('player_tint', sw, sh);
+    const oc2d = oc._ctx;
+    oc2d.clearRect(0, 0, sw, sh);
+    oc2d.globalCompositeOperation = 'source-over';
+    oc2d.globalAlpha = 1;
     oc2d.imageSmoothingEnabled = false;
     oc2d.drawImage(sprite, 0, 0, sw, sh);
     oc2d.globalCompositeOperation = 'source-atop';
     oc2d.fillStyle = (player.hurtTimer > 0 && !player.dashing && !player.homingWindup) ? 'rgba(255,0,0,0.55)' : 'rgba(255,255,255,0.9)';
     oc2d.fillRect(0, 0, sw, sh);
+    oc2d.globalCompositeOperation = 'source-over';
     drawSpr = oc;
   }
 
