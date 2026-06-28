@@ -517,31 +517,25 @@ function drawPlayer() {
   const px     = Math.round(player.x - cameraX);
   const bottom = Math.round(player.y + player.h - cameraY);
 
-  // draw trail — smooth tapered ribbon from tail (thin/faint) to head (thick/bright)
+  // draw trail — pixelated rectangles, fading and shrinking toward tail
   if (player.trail.length > 1) {
     const n = player.trail.length;
-    // draw in passes: each pass is one segment, but use quadratic curves through midpoints
-    // so adjacent segments blend seamlessly
-    for (let i = 1; i < n; i++) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    for (let i = 0; i < n; i++) {
       const t = i / (n - 1); // 0=tail, 1=head
-      const a = player.trail[i - 1];
-      const b = player.trail[i];
-      const mx = (a.x + b.x) / 2 - cameraX;
-      const my = (a.y + b.y) / 2 - cameraY;
-      const prevMx = i > 1 ? (player.trail[i - 2].x + a.x) / 2 - cameraX : a.x - cameraX;
-      const prevMy = i > 1 ? (player.trail[i - 2].y + a.y) / 2 - cameraY : a.y - cameraY;
-      ctx.save();
-      ctx.globalAlpha = t * t * 0.9;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = t * 16;
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(prevMx, prevMy);
-      ctx.quadraticCurveTo(a.x - cameraX, a.y - cameraY, mx, my);
-      ctx.stroke();
-      ctx.restore();
+      const pt = player.trail[i];
+      const alpha = t * t * 0.75;
+      const size = Math.max(1, Math.round(t * 6));
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(
+        Math.round(pt.x - cameraX) - (size >> 1),
+        Math.round(pt.y - cameraY) - (size >> 1),
+        size, size
+      );
     }
+    ctx.restore();
   }
 
   const standingSpr = sprites['standing'].naturalWidth ? sprites['standing'] : sprites['walk1'];
@@ -665,18 +659,29 @@ function drawPlayer() {
     ctx.restore();
   }
 
-  // hover ring: pulses while locked on pre-launch
+  // hover indicator: pixel corner brackets around player while locking on
   if (player.homingWindup > 0 && S.homingHover > 0) {
     const t = 1 - player.homingWindup / S.homingHover;
     const wcx = Math.round(player.x + player.w / 2 - cameraX);
     const wcy = Math.round(player.y + player.h / 2 - cameraY);
+    const r = Math.round(8 + t * 8);
+    const arm = 4;
     ctx.save();
-    ctx.globalAlpha = 0.9 - t * 0.5;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(wcx, wcy, 6 + t * 14, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = 0.9 - t * 0.4;
+    ctx.fillStyle = '#ffffff';
+    // top-left
+    ctx.fillRect(wcx - r,       wcy - r,       arm, 1);
+    ctx.fillRect(wcx - r,       wcy - r,       1, arm);
+    // top-right
+    ctx.fillRect(wcx + r - arm, wcy - r,       arm, 1);
+    ctx.fillRect(wcx + r - 1,   wcy - r,       1, arm);
+    // bottom-left
+    ctx.fillRect(wcx - r,       wcy + r - 1,   arm, 1);
+    ctx.fillRect(wcx - r,       wcy + r - arm, 1, arm);
+    // bottom-right
+    ctx.fillRect(wcx + r - arm, wcy + r - 1,   arm, 1);
+    ctx.fillRect(wcx + r - 1,   wcy + r - arm, 1, arm);
     ctx.restore();
   }
 
