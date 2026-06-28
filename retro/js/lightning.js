@@ -93,11 +93,4 @@ function drawLightning() {
     ctx.globalAlpha = 1;
   }
 
-  if (S.flashDur > 0 && now >= lightning.flashStart && now < lightning.flashEnd) {
-    const flashMs = S.flashDur * (1000 / 60);
-    const t = (lightning.flashEnd - now) / flashMs;
-    const flashAlpha = Math.pow(t, 3) * 0.95;
-    ctx.fillStyle = `rgba(255,255,255,${flashAlpha})`;
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-  }
 }
