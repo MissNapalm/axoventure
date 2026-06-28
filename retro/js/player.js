@@ -106,8 +106,6 @@ function updatePlayer() {
           player.vx = player.facingLeft ? -GROUND_DASH_SPEED : GROUND_DASH_SPEED;
           player.vy = 0;
           if (!player.onGround) player.airDashUsed = true;
-          hitFreezeTimer = HIT_FREEZE_FRAMES;
-          screenShakeTimer = SCREEN_SHAKE_FRAMES;
         }
       }
     }
@@ -162,11 +160,7 @@ function updatePlayer() {
       const dist = Math.hypot((e.x + e.w / 2) - pcx, ey - pcy);
       if (dist < bestDist) { bestDist = dist; best = e; }
     }
-    if (best) {
-      player.dashing = true; player.dashTarget = best; player.homingUsed = true;
-      hitFreezeTimer = HIT_FREEZE_FRAMES;
-      screenShakeTimer = SCREEN_SHAKE_FRAMES;
-    }
+    if (best) { player.dashing = true; player.dashTarget = best; player.homingUsed = true; }
   }
 
   if (player.dashing && player.dashTarget) {
