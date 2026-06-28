@@ -116,6 +116,11 @@ function hurtPlayer() {
   player.hp--;
   player.hurtTimer = HURT_FRAMES;
   player.dashing = false; player.dashTarget = null;
+  player.groundDashing = false; player.groundDashTimer = 0;
+  player.homingWindup = 0; player.homingWindupTarget = null;
+  // small upward bounce so gravity takes over and player doesn't float
+  if (player.onGround) player.vy = -2;
+  player.onGround = false;
   if (player.hp <= 0) startDeathSequence();
 }
 
