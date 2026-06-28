@@ -33,10 +33,13 @@ const player = {
   killSpin: 0,
   killText: null, // { text, timer, x, y }
   inWater: false,
+  wasInWater: false,
   bubbles: [],
   bubbleTimer: 0,
   postDashTimer: 0,
   swimBobPhase: 0,
+  waterExitSpin: 0,   // spin angle when launched out of water by dash
+  splash: [],         // splash particles
 };
 
 function resetLevel() {
@@ -55,6 +58,9 @@ function resetLevel() {
   player.carrying = null;
   player.groundDashing = false; player.groundDashTimer = 0; player.airDashUsed = false; player.knockbackTimer = 0;
   player.inWater = false;
+  player.wasInWater = false;
+  player.waterExitSpin = 0;
+  player.splash = [];
   player.bubbles = [];
   player.bubbleTimer = 0;
   player.postDashTimer = 0;
@@ -224,7 +230,11 @@ function updatePlayer() {
           player.vx = nx * GROUND_DASH_SPEED;
           player.vy = ny * GROUND_DASH_SPEED;
           player.facingLeft = nx < 0;
-          if (!player.onGround) player.airDashUsed = true;
+          if (!player.onGround && !player.inWater) player.airDashUsed = true;
+          // launching out of water with upward component → start spin
+          if (player.wasInWater && !player.inWater && player.vy < 0) {
+            player.waterExitSpin = 1; // active spin flag
+          }
         }
       }
     }
@@ -256,6 +266,7 @@ function updatePlayer() {
   // detect water
   const pcx = player.x + player.w / 2;
   const pcy = player.y + player.h / 2;
+  player.wasInWater = player.inWater;
   player.inWater = (
     pcx >= WATER_ZONE.x && pcx <= WATER_ZONE.x + WATER_ZONE.w &&
     pcy >= WATER_ZONE.y && pcy <= WATER_ZONE.y + WATER_ZONE.h
@@ -263,6 +274,30 @@ function updatePlayer() {
     pcx >= WATER_ZONE_2.x && pcx <= WATER_ZONE_2.x + WATER_ZONE_2.w &&
     pcy >= WATER_ZONE_2.y && pcy <= WATER_ZONE_2.y + WATER_ZONE_2.h
   );
+
+  // water transition — spawn splash
+  if (player.inWater !== player.wasInWater) {
+    const sx = pcx, sy = player.y + (player.inWater ? 0 : player.h);
+    for (let i = 0; i < 18; i++) {
+      const angle = -Math.PI + (Math.random() * Math.PI); // upward arc
+      const speed = 1.5 + Math.random() * 4;
+      player.splash.push({
+        x: sx + (Math.random() - 0.5) * player.w,
+        y: sy,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 2,
+        life: 14 + Math.floor(Math.random() * 12),
+        maxLife: 26,
+        size: Math.random() < 0.5 ? 2 : 1,
+        gravity: 0.18,
+      });
+    }
+    // stop spin on water entry
+    if (player.inWater) player.waterExitSpin = 0;
+  }
+
+  // stop spin on landing
+  if (player.onGround) player.waterExitSpin = 0;
 
   // bubble spawning from axo's mouth
   for (let i = player.bubbles.length - 1; i >= 0; i--) {
@@ -275,6 +310,7 @@ function updatePlayer() {
   }
   if (player.inWater) {
     player.swimBobPhase += 0.07;
+    player.airDashUsed = false; // unlimited dash in water
     player.bubbleTimer--;
     if (player.bubbleTimer <= 0) {
       player.bubbleTimer = 18 + Math.floor(Math.random() * 20);
@@ -395,6 +431,15 @@ function updatePlayer() {
   if (player.groundDashing) {
     player.trail.push({ x: player.x + player.w / 2, y: player.y + player.h / 2, life: 18 });
   }
+  // advance water exit spin
+  if (player.waterExitSpin > 0) player.waterExitSpin += 0.28; // ~1.75 rad/frame ≈ fast spin
+
+  // update splash particles
+  for (const p of player.splash) {
+    p.x += p.vx; p.y += p.vy; p.vy += p.gravity; p.life--;
+  }
+  player.splash = player.splash.filter(p => p.life > 0);
+
   // fade trail
   for (const t of player.trail) t.life--;
   player.trail = player.trail.filter(t => t.life > 0);
@@ -618,7 +663,14 @@ function drawPlayer() {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
 
-  if (player.killSpin > 0) {
+  if (player.waterExitSpin > 0) {
+    const pcx = player.x + player.w / 2 - cameraX;
+    const pcy = player.y + player.h / 2 - cameraY;
+    ctx.translate(pcx, pcy);
+    ctx.rotate(player.waterExitSpin);
+    if (!player.facingLeft) ctx.scale(-1, 1);
+    ctx.drawImage(drawSpr, -sw / 2, -sh / 2, sw, sh);
+  } else if (player.killSpin > 0) {
     const pcx = player.x + player.w / 2 - cameraX;
     const pcy = player.y + player.h / 2 - cameraY;
     const t = 1 - player.killSpin / 10;
@@ -648,6 +700,22 @@ function drawPlayer() {
   }
 
   ctx.restore();
+
+  // splash particles
+  if (player.splash.length > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    for (const p of player.splash) {
+      const alpha = p.life / p.maxLife;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = alpha > 0.5 ? '#a8d8f0' : '#ffffff';
+      const sx2 = Math.round(p.x - cameraX);
+      const sy2 = Math.round(p.y - cameraY);
+      ctx.fillRect(sx2, sy2, p.size, p.size);
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
 
   // futuristic crosshair on homing target
   const crossTarget = player.homingWindupTarget || (player.dashing ? player.dashTarget : null);
