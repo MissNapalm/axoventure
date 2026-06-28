@@ -411,7 +411,7 @@ function drawPlayer() {
   } else if (player.groundDashing) {
     sprite = Math.abs(Math.sin(player.groundDashAngle)) > 0.3
       ? sprites['jump']
-      : sprites[WALK_SEQ[player.frame]];
+      : sprites['walk2'];
   } else if (!player.onGround) {
     sprite = sprites['jump'];
   } else if (player.moving) {
@@ -450,9 +450,10 @@ function drawPlayer() {
     const pcx = player.x + player.w / 2 - cameraX;
     const pcy = player.y + player.h / 2 - cameraY;
     const t = 1 - player.killSpin / 10;
+    const spinSpr = sprites['walk1'];
     ctx.translate(pcx, pcy);
     ctx.rotate(t * Math.PI * 2);
-    ctx.drawImage(drawSpr, -sw / 2, -sh / 2, sw, sh);
+    ctx.drawImage(spinSpr, -spinSpr.naturalWidth / 2, -spinSpr.naturalHeight / 2, spinSpr.naturalWidth, spinSpr.naturalHeight);
   } else if (player.dashing && player.dashTarget) {
     const pcx = player.x + player.w / 2 - cameraX;
     const pcy = player.y + player.h / 2 - cameraY;
