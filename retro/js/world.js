@@ -97,23 +97,22 @@ const raindrops = Array.from({ length: 60 }, () => ({
   speed: Math.floor(Math.random() * 2) + 2,
 }));
 
-// Pre-rendered water fill (gradient is vertical, position-independent)
-const _waterOC = getOC('water_fill', WATER_ZONE.w, WATER_ZONE.h);
-(function() {
-  const g = _waterOC._ctx.createLinearGradient(0, 0, 0, WATER_ZONE.h);
-  g.addColorStop(0,   'rgba(20,80,140,0.82)');
-  g.addColorStop(0.5, 'rgba(8,40,90,0.90)');
-  g.addColorStop(1,   'rgba(4,18,50,0.97)');
-  _waterOC._ctx.fillStyle = g;
-  _waterOC._ctx.fillRect(0, 0, WATER_ZONE.w, WATER_ZONE.h);
-})();
-
+let _waterOC = null;
 function drawWater() {
   const wx = Math.round(WATER_ZONE.x - cameraX);
   const wy = Math.round(WATER_ZONE.y - cameraY);
   const ww = WATER_ZONE.w;
   const wh = WATER_ZONE.h;
 
+  if (!_waterOC) {
+    _waterOC = getOC('water_fill', ww, wh);
+    const g = _waterOC._ctx.createLinearGradient(0, 0, 0, wh);
+    g.addColorStop(0,   'rgba(20,80,140,0.82)');
+    g.addColorStop(0.5, 'rgba(8,40,90,0.90)');
+    g.addColorStop(1,   'rgba(4,18,50,0.97)');
+    _waterOC._ctx.fillStyle = g;
+    _waterOC._ctx.fillRect(0, 0, ww, wh);
+  }
   ctx.drawImage(_waterOC, wx, wy);
 
   // surface shimmer lines
@@ -162,22 +161,22 @@ function drawWater() {
   ctx.restore();
 }
 
-const _water2OC = getOC('water2_fill', WATER_ZONE_2.w, WATER_ZONE_2.h);
-(function() {
-  const g = _water2OC._ctx.createLinearGradient(0, 0, 0, WATER_ZONE_2.h);
-  g.addColorStop(0,   'rgba(20,80,140,0.82)');
-  g.addColorStop(0.5, 'rgba(8,40,90,0.90)');
-  g.addColorStop(1,   'rgba(4,18,50,0.97)');
-  _water2OC._ctx.fillStyle = g;
-  _water2OC._ctx.fillRect(0, 0, WATER_ZONE_2.w, WATER_ZONE_2.h);
-})();
-
+let _water2OC = null;
 function drawWater2() {
   const wx = Math.round(WATER_ZONE_2.x - cameraX);
   const wy = Math.round(WATER_ZONE_2.y - cameraY);
   const ww = WATER_ZONE_2.w;
   const wh = WATER_ZONE_2.h;
 
+  if (!_water2OC) {
+    _water2OC = getOC('water2_fill', ww, wh);
+    const g = _water2OC._ctx.createLinearGradient(0, 0, 0, wh);
+    g.addColorStop(0,   'rgba(20,80,140,0.82)');
+    g.addColorStop(0.5, 'rgba(8,40,90,0.90)');
+    g.addColorStop(1,   'rgba(4,18,50,0.97)');
+    _water2OC._ctx.fillStyle = g;
+    _water2OC._ctx.fillRect(0, 0, ww, wh);
+  }
   ctx.drawImage(_water2OC, wx, wy);
 
   const t = Date.now() * 0.001;
@@ -192,17 +191,16 @@ function drawWater2() {
   ctx.restore();
 }
 
-// Pre-rendered background gradient (static, never changes)
-const _bgOC = getOC('bg_grad', VIEW_W, VIEW_H);
-(function() {
-  const g = _bgOC._ctx.createLinearGradient(0, 0, 0, VIEW_H);
-  g.addColorStop(0, '#0d0521');
-  g.addColorStop(1, '#1a0a3e');
-  _bgOC._ctx.fillStyle = g;
-  _bgOC._ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-})();
-
+let _bgOC = null;
 function drawBg() {
+  if (!_bgOC) {
+    _bgOC = getOC('bg_grad', VIEW_W, VIEW_H);
+    const g = _bgOC._ctx.createLinearGradient(0, 0, 0, VIEW_H);
+    g.addColorStop(0, '#0d0521');
+    g.addColorStop(1, '#1a0a3e');
+    _bgOC._ctx.fillStyle = g;
+    _bgOC._ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
   ctx.drawImage(_bgOC, 0, 0);
 
   const t = Date.now() * 0.001;
