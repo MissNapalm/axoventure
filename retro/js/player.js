@@ -34,6 +34,7 @@ function resetLevel() {
   player.carrying = null;
   player.groundDashing = false; player.groundDashTimer = 0; player.airDashUsed = false; player.knockbackTimer = 0;
   cameraX = 0;
+  cameraY = 0;
   // reset enemies
   for (const e of enemies) {
     e.x = e.startX;
@@ -258,6 +259,8 @@ function updatePlayer() {
   if (player.onGround) { player.dashing = false; player.dashTarget = null; player.homingUsed = false; player.airDashUsed = false; }
 
   cameraX += ((player.x - VIEW_W / 2 + player.w / 2) - cameraX) * 0.12;
+  cameraY += ((player.y - VIEW_H / 2 + player.h / 2) - cameraY) * 0.08;
+  if (cameraY < 0) cameraY = 0;
 
   if (player.moving && player.onGround) {
     player.frameTimer++;
@@ -270,7 +273,7 @@ function updatePlayer() {
 function drawPlayer() {
   if (!assetsReady()) return;
   const px     = Math.round(player.x - cameraX);
-  const bottom = Math.round(player.y + player.h);
+  const bottom = Math.round(player.y + player.h - cameraY);
 
   // draw trail — thick+bright at head (newest), thin+faded at tail (oldest)
   if (player.trail.length > 1) {
@@ -285,8 +288,8 @@ function drawPlayer() {
       ctx.lineWidth = t * 9;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(a.x - cameraX, a.y);
-      ctx.lineTo(b.x - cameraX, b.y);
+      ctx.moveTo(a.x - cameraX, a.y - cameraY);
+      ctx.lineTo(b.x - cameraX, b.y - cameraY);
       ctx.stroke();
       ctx.restore();
     }
@@ -337,7 +340,7 @@ function drawPlayer() {
 
   if (player.dashing && player.dashTarget) {
     const pcx = player.x + player.w / 2 - cameraX;
-    const pcy = player.y + player.h / 2;
+    const pcy = player.y + player.h / 2 - cameraY;
     const snapped = player.dashAngle || 0;
     const facingRight = Math.cos(snapped) >= 0;
     ctx.translate(pcx, pcy);

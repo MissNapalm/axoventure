@@ -34,11 +34,23 @@ function makeEnemy(x, patrolLeft, patrolRight, platformY) {
 }
 
 const enemies = [
+  // upper section
   makeEnemy(100,   80,  155, 175),
   makeEnemy(530,  500,  585, 165),
   makeEnemy(680,  650,  720, 140),
   makeEnemy(950,  920, 995,  148),
   makeEnemy(1230, 1200, 1275, 155),
+  // lower section (on ground at LOWER_Y)
+  makeEnemy(2000, 1950, 2090, LOWER_Y),
+  makeEnemy(2180, 2120, 2300, LOWER_Y),
+  makeEnemy(2450, 2400, 2510, LOWER_Y),
+  makeEnemy(2600, 2560, 2660, LOWER_Y),
+  makeEnemy(2750, 2700, 2830, LOWER_Y),
+  makeEnemy(2950, 2900, 3040, LOWER_Y),
+  // lower section floating platform enemies
+  makeEnemy(2110, 2100, 2180, 275),
+  makeEnemy(2530, 2520, 2610, 250),
+  makeEnemy(2810, 2800, 2880, 248),
 ];
 
 function makeRedEnemy(x, patrolLeft, patrolRight, platformY) {
@@ -76,6 +88,11 @@ function makeRedEnemy(x, patrolLeft, patrolRight, platformY) {
 const redEnemies = [
   makeRedEnemy(300, 260, 380, GROUND_Y),
   makeRedEnemy(720, 680, 800, GROUND_Y),
+  // lower section red enemies
+  makeRedEnemy(2080, 2030, 2160, LOWER_Y),
+  makeRedEnemy(2340, 2280, 2420, LOWER_Y),
+  makeRedEnemy(2690, 2640, 2770, LOWER_Y),
+  makeRedEnemy(2870, 2820, 2960, LOWER_Y),
 ];
 
 // called from player.js when homing into a red enemy
@@ -191,8 +208,8 @@ function updateRedEnemies() {
       }
 
       // hit ground
-      if (e._y + e.h >= GROUND_Y) {
-        e._y = GROUND_Y - e.h;
+      if (e._y + e.h >= e.platformY) {
+        e._y = e.platformY - e.h;
         e.vy *= -0.45;
         e.vx *= 0.8;
         if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; }
@@ -243,7 +260,7 @@ function drawRedEnemy(e) {
     ? (player.y - e.h + S.carryOffset + (player.onGround ? 0 : S.carryJumpY))
     : (e.flipped ? e._y + S.flippedGndY : (e.flipping || e.thrown) ? e._y : e.y);
   const sx = Math.round(e.x - cameraX);
-  const sy = Math.round(drawY);
+  const sy = Math.round(drawY - cameraY);
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
@@ -293,7 +310,7 @@ function drawRedEnemies() {
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.fillStyle = '#ff4444';
-      const sx = Math.round(p.x - cameraX), sy = Math.round(p.y), s = p.size || 2;
+      const sx = Math.round(p.x - cameraX), sy = Math.round(p.y - cameraY), s = p.size || 2;
       ctx.fillRect(sx - s, sy, s * 2 + 1, 1);
       ctx.fillRect(sx, sy - s, 1, s * 2 + 1);
       ctx.restore();
@@ -404,7 +421,7 @@ function drawEnemies() {
       ctx.globalAlpha = alpha;
       ctx.fillStyle = '#ffffff';
       const sx = Math.round(p.x - cameraX);
-      const sy = Math.round(p.y);
+      const sy = Math.round(p.y - cameraY);
       const s = p.size;
       // pixel star: cross shape
       ctx.fillRect(sx - s, sy,     s * 2 + 1, 1);
@@ -414,7 +431,7 @@ function drawEnemies() {
 
     if (e.dead || e.w === 0) continue;
     const sx = Math.round(e.x - cameraX);
-    const sy = Math.round(e.y);
+    const sy = Math.round(e.y - cameraY);
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;

@@ -37,7 +37,7 @@ function drawNpcs() {
   for (const npc of npcs) {
     if (!sprites[npc.sprite].naturalWidth) continue;
     const sx = Math.round(npc.x - cameraX);
-    const sy = Math.round(npc.y);
+    const sy = Math.round(npc.y - cameraY);
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
