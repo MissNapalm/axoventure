@@ -12,9 +12,6 @@ const platforms = [
   { x: 1060, y: 125, w: 75,  h: 8,  color: '#5c3d2e', oneWay: true },
   { x: 1200, y: 155, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
   { x: 1340, y: 130, w: 90,  h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 470,  y: 185, w: 22,  h: 25, color: '#4a2f22' },
-  { x: 760,  y: 180, w: 22,  h: 30, color: '#4a2f22' },
-  { x: 1000, y: 175, w: 22,  h: 35, color: '#4a2f22' },
 ];
 
 const stars = Array.from({ length: 80 }, () => ({

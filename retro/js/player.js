@@ -20,6 +20,7 @@ const player = {
   carrying: null,
   groundDashing: false,
   groundDashTimer: 0,
+  knockbackTimer: 0,
 };
 
 function resetLevel() {
@@ -30,7 +31,7 @@ function resetLevel() {
   player.hurtTimer = 0;
   player.dashing = false; player.dashTarget = null;
   player.carrying = null;
-  player.groundDashing = false; player.groundDashTimer = 0;
+  player.groundDashing = false; player.groundDashTimer = 0; player.knockbackTimer = 0;
   cameraX = 0;
   // reset enemies
   for (const e of enemies) {
@@ -94,7 +95,7 @@ function updatePlayer() {
       const nearby = nearNpc();
       if (nearby) {
         openDialog(nearby);
-      } else if (!player.groundDashing) {
+      } else if (player.onGround && !player.groundDashing) {
         player.groundDashing = true;
         player.groundDashTimer = GROUND_DASH_FRAMES;
         player.vx = player.facingLeft ? -GROUND_DASH_SPEED : GROUND_DASH_SPEED;
@@ -121,8 +122,10 @@ function updatePlayer() {
   const run   = keys['KeyM'];
   const speed = run ? S.walkSpeed * S.runMult : S.walkSpeed;
 
+  if (player.knockbackTimer > 0) player.knockbackTimer--;
+
   player.moving = false;
-  if (!player.groundDashing) {
+  if (!player.groundDashing && player.knockbackTimer === 0) {
     if (left)       { player.vx = -speed; player.facingLeft = true;  player.moving = true; }
     else if (right) { player.vx =  speed; player.facingLeft = false; player.moving = true; }
     else            { player.vx *= 0.7; }
@@ -195,6 +198,7 @@ function updatePlayer() {
       if (e.red) {
         flipRedEnemy(e);
         player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -S.redBounceBack : S.redBounceBack;
+        player.knockbackTimer = 12;
       } else if (e.stunTimer > 0) {
         hurtPlayer();
       } else {
@@ -220,6 +224,7 @@ function updatePlayer() {
         if (e.red) {
           flipRedEnemy(e);
           player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -S.redBounceBack : S.redBounceBack;
+          player.knockbackTimer = 12;
         } else if (e.stunTimer > 0) {
           hurtPlayer();
         } else {

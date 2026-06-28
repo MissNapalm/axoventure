@@ -61,6 +61,7 @@ function makeRedEnemy(x, patrolLeft, patrolRight, platformY) {
     patrolLeft, patrolRight,
     dead: false,
     flipped: false,   // on back after homing hit
+    flippedTimer: 0,  // counts up while flipped; resets to patrol after 3s
     flipping: false,  // mid-air arc before landing upside down
     carried: false,   // player is holding it
     thrown: false,    // in flight
@@ -117,7 +118,7 @@ function updateRedEnemies() {
       if (dist > VIEW_W) {
         e.x = e.startX; e._y = e.platformY - e.h;
         e.vx = e.patrolSpeed; e.vy = 0;
-        e.dead = false; e.flipped = false; e.flipping = false; e.carried = false; e.thrown = false;
+        e.dead = false; e.flipped = false; e.flippedTimer = 0; e.flipping = false; e.carried = false; e.thrown = false;
         e.hitFlash = 0; e.frame = 0; e.frameTimer = 0; e.throwAngle = 0;
         e.jitterX = 0; e.jitterY = 0; e.jitterTimer = 0; e.particles = [];
       }
@@ -125,6 +126,8 @@ function updateRedEnemies() {
     }
 
     if (e.carried) {
+      e.frameTimer++;
+      if (e.frameTimer >= 10) { e.frameTimer = 0; e.frame = (e.frame + 1) % 2; }
       const xOff = player.facingLeft ? S.carryOffsetL : S.carryOffsetR;
       e.x = player.x + player.w / 2 - e.w / 2 + xOff;
       // touching a normal enemy while carried kills both
@@ -149,7 +152,7 @@ function updateRedEnemies() {
       if (e._y + e.h >= e.platformY) {
         e._y = e.platformY - e.h;
         e.flipping = false;
-        e.flipped = true;
+        e.flipped = true; e.flippedTimer = 0;
         e.vy = 0; e.throwAngle = 0;
       }
       continue;
@@ -183,7 +186,7 @@ function updateRedEnemies() {
           e._y = p.y - e.h;
           e.vy *= -0.5;
           e.vx *= 0.85;
-          if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.vx = 0; e.vy = 0; }
+          if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; }
         }
       }
 
@@ -192,7 +195,7 @@ function updateRedEnemies() {
         e._y = GROUND_Y - e.h;
         e.vy *= -0.45;
         e.vx *= 0.8;
-        if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.vx = 0; e.vy = 0; }
+        if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; }
       }
       continue;
     }
@@ -201,7 +204,18 @@ function updateRedEnemies() {
     e.frameTimer++;
     if (e.frameTimer >= 10) { e.frameTimer = 0; e.frame = (e.frame + 1) % 2; }
 
-    if (e.flipped) continue; // wait to be picked up
+    if (e.flipped) {
+      e.flippedTimer++;
+      if (e.flippedTimer >= 180) {
+        e.flipped = false;
+        e.flippedTimer = 0;
+        e._y = 0;
+        e.patrolLeft  = e.x - 40;
+        e.patrolRight = e.x + 40;
+        e.vx = e.patrolSpeed;
+      }
+      continue;
+    }
 
     // patrol
     e.x += e.vx;
