@@ -97,22 +97,44 @@ function resolveCollisions() {
 }
 
 function spawnImpactVFX(x, y) {
-  // screen flash
-  player.impactFlash = 6;
+  player.impactFlash = 10;
 
-  // 16 spark lines — two rings, inner fast short, outer slow long
-  for (let i = 0; i < 16; i++) {
-    const angle = (i / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
-    const inner = i % 2 === 0;
-    const speed = inner ? 4 + Math.random() * 2 : 2 + Math.random() * 1.5;
-    const life  = inner ? 8 + Math.floor(Math.random() * 4) : 14 + Math.floor(Math.random() * 6);
+  // wave 1 — fast pixel chunks flying outward (white/yellow)
+  for (let i = 0; i < 24; i++) {
+    const angle = (i / 24) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+    const speed = 5 + Math.random() * 5;
+    const size  = Math.random() < 0.5 ? 3 : 2;
     player.sparks.push({
       x, y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      life, maxLife: life,
-      color: inner ? '#ffffff' : '#80e0ff',
-      lw: inner ? 2 : 1.5,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      life: 10 + Math.floor(Math.random() * 6), maxLife: 16,
+      color: Math.random() < 0.6 ? '#ffffff' : '#ffff80',
+      size, kind: 'box', gravity: 0.18,
+    });
+  }
+
+  // wave 2 — slower cyan debris
+  for (let i = 0; i < 16; i++) {
+    const angle = (i / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+    const speed = 2 + Math.random() * 3;
+    player.sparks.push({
+      x, y,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 1,
+      life: 14 + Math.floor(Math.random() * 8), maxLife: 22,
+      color: Math.random() < 0.5 ? '#80e0ff' : '#c0ffff',
+      size: 2, kind: 'box', gravity: 0.1,
+    });
+  }
+
+  // wave 3 — thin fast streaks (classic 16-bit star burst)
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2;
+    const speed = 7 + Math.random() * 4;
+    player.sparks.push({
+      x, y,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+      life: 7 + Math.floor(Math.random() * 4), maxLife: 11,
+      color: '#ffffff', size: 1.5, kind: 'line', gravity: 0,
     });
   }
 }
@@ -463,11 +485,13 @@ function drawPlayer() {
     }
   }
 
-  // full-screen white flash on impact
+  // full-screen white flash + bloom on impact
   if (player.impactFlash > 0) {
     player.impactFlash--;
+    const ft = player.impactFlash / 10;
     ctx.save();
-    ctx.globalAlpha = (player.impactFlash / 6) * 0.5;
+    // hard white core flash
+    ctx.globalAlpha = ft * ft * 0.85;
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     ctx.restore();
@@ -491,21 +515,31 @@ function drawPlayer() {
     ctx.restore();
   }
 
-  // spark lines radiating from impact point
+  // sparks — pixel boxes and streak lines
   for (let i = player.sparks.length - 1; i >= 0; i--) {
     const sp = player.sparks[i];
     sp.life--;
     if (sp.life <= 0) { player.sparks.splice(i, 1); continue; }
-    const alpha = sp.life / sp.maxLife;
+    if (sp.gravity) sp.vy += sp.gravity;
+    const alpha = (sp.life / sp.maxLife);
+    const sx = Math.round(sp.x - cameraX);
+    const sy = Math.round(sp.y - cameraY);
     ctx.save();
     ctx.globalAlpha = alpha;
+    ctx.fillStyle = sp.color || '#ffffff';
     ctx.strokeStyle = sp.color || '#ffffff';
-    ctx.lineWidth = sp.lw || 1.5;
-    ctx.beginPath();
-    ctx.moveTo(Math.round(sp.x - cameraX), Math.round(sp.y - cameraY));
-    sp.x += sp.vx; sp.y += sp.vy;
-    ctx.lineTo(Math.round(sp.x - cameraX), Math.round(sp.y - cameraY));
-    ctx.stroke();
+    if (sp.kind === 'box') {
+      const s = sp.size || 2;
+      ctx.fillRect(sx - (s / 2 | 0), sy - (s / 2 | 0), s, s);
+      sp.x += sp.vx; sp.y += sp.vy;
+    } else {
+      ctx.lineWidth = sp.size || 1.5;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      sp.x += sp.vx; sp.y += sp.vy;
+      ctx.lineTo(Math.round(sp.x - cameraX), Math.round(sp.y - cameraY));
+      ctx.stroke();
+    }
     ctx.restore();
   }
 }
