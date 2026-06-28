@@ -8,7 +8,7 @@ function drawHUD() {
 
   // health meter
   const METER_X = 6;
-  const METER_Y = VIEW_H - 13;
+  const METER_Y = 20;
   const METER_W = 48;
   const METER_H = 7;
   const fill = Math.max(0, Math.min(1, player.hp / PLAYER_MAX_HP));
