@@ -330,6 +330,10 @@ function updatePlayer() {
 
   if (player.hurtTimer > 0) player.hurtTimer--;
   if (player.postDashTimer > 0) player.postDashTimer--;
+  // slow passive regen — only when not recently hurt, not at max
+  if (player.hurtTimer === 0 && player.hp < PLAYER_MAX_HP) {
+    player.hp = Math.min(PLAYER_MAX_HP, player.hp + 0.0008);
+  }
 
   if (player.killSpin > 0) player.killSpin--;
 
