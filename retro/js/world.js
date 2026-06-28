@@ -15,7 +15,7 @@ const death = {
 };
 
 // Water zone: player swims freely inside this rectangle
-const WATER_ZONE = { x: 1700, y: 230, w: 2200, h: 600 };
+const WATER_ZONE = { x: 1700, y: 230, w: 2540, h: 600 };
 // The seafloor/rock shelf that closes the bottom
 const WATER_FLOOR_Y = WATER_ZONE.y + WATER_ZONE.h;
 
