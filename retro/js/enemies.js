@@ -419,8 +419,8 @@ const fishEnemies = [
   makeFish(4560, 600, 4490, 4960),
   makeFish(4880, 550, 4490, 4960),
   // dartfish guarding the orange at the bottom of the second pool
-  makeDartfish(4530, 850, 4490, 4960),
-  makeDartfish(4820, 870, 4490, 4960),
+  makeDartfish(4530, 780, 4490, 4960),
+  makeDartfish(4820, 800, 4490, 4960),
 ];
 
 function updateFish() {

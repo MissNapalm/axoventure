@@ -7,7 +7,9 @@ const CRY_FRAMES = ['cap2','cap3','cap4','cap5','cap6','cap7','cap8','cap10'];
 let cryFrame = 0;
 let cryTimer = 0;
 let cryDone = false;
-const CRY_INTERVAL = 18; // frames per animation step (slow)
+let cryLoops = 0;
+const CRY_LOOPS = 3;
+const CRY_INTERVAL = 18;
 
 const npcs = [
   {
@@ -67,11 +69,11 @@ const npcs = [
     get y() { return LAND2_Y - this.h; },
     lines: [
       "I'm sorry about Edwin.\nHe's lost so much.",
-      "He lost his whole family in\nthe freeze last winter, and I\nthink he's just starting to\nrealize they aren't coming back",
+      "He lost his whole family in\nthe freeze last winter, and I\nthink he's just starting to\nrealize they aren't coming back.",
       "He even lost his orange...",
       "Can you help find it for him?",
       "It may not do much but...",
-      "It's worth a try",
+      "It's worth a try.",
     ],
   },
 ];
@@ -93,11 +95,19 @@ function tickNpcs() {
       if (cryTimer >= CRY_INTERVAL) {
         cryTimer = 0;
         cryFrame++;
-        if (cryFrame >= CRY_FRAMES.length - 1) { cryFrame = CRY_FRAMES.length - 1; cryDone = true; }
+        if (cryFrame >= CRY_FRAMES.length) {
+          cryLoops++;
+          if (cryLoops >= CRY_LOOPS) {
+            cryFrame = CRY_FRAMES.length - 1;
+            cryDone = true;
+          } else {
+            cryFrame = 0;
+          }
+        }
       }
     }
   } else {
-    cryFrame = 0; cryTimer = 0; cryDone = false;
+    cryFrame = 0; cryTimer = 0; cryDone = false; cryLoops = 0;
   }
 }
 

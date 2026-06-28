@@ -92,10 +92,13 @@ function drawOrange() {
   ctx.fillRect(sx + 7, sy,     3, 1);
   ctx.fillRect(sx + 8, sy + 1, 2, 1);
 
-  // Glow
-  ctx.globalAlpha = 0.18;
-  ctx.fillStyle = '#ffb347';
-  ctx.fillRect(sx - 2, sy - 2, 16, 16);
+  // Glow — radial so it doesn't look like a box
+  const grd = ctx.createRadialGradient(sx + 6, sy + 6, 1, sx + 6, sy + 6, 10);
+  grd.addColorStop(0, 'rgba(255,180,60,0.30)');
+  grd.addColorStop(1, 'rgba(255,180,60,0)');
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = grd;
+  ctx.fillRect(sx - 4, sy - 4, 20, 20);
   ctx.restore();
 }
 
