@@ -7,7 +7,7 @@ const LOWER_Y = 310; // lower ground level after capybaras
 
 const platforms = [
   // upper ground (original section)
-  { x: -200, y: 210, w: 1900, h: 60, color: '#3d2b1f' },
+  { x: -200, y: 210, w: 1900, h: 400, color: '#3d2b1f' },
   // floating platforms (original)
   { x: 80,   y: 175, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
   { x: 230,  y: 155, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
@@ -24,7 +24,7 @@ const platforms = [
   { x: 1820, y: 260, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
   { x: 1940, y: 285, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
   // lower ground section
-  { x: 1700, y: LOWER_Y, w: 2400, h: 60, color: '#2b1a10' },
+  { x: 1700, y: LOWER_Y, w: 2400, h: 400, color: '#2b1a10' },
   // lower section floating platforms
   { x: 2100, y: 275, w: 80,  h: 8,  color: '#4a2e1e', oneWay: true },
   { x: 2240, y: 255, w: 75,  h: 8,  color: '#4a2e1e', oneWay: true },
