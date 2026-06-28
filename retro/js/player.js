@@ -36,6 +36,7 @@ const player = {
   bubbles: [],
   bubbleTimer: 0,
   postDashTimer: 0,
+  swimBobPhase: 0,
 };
 
 function resetLevel() {
@@ -273,6 +274,7 @@ function updatePlayer() {
     if (b.life <= 0) player.bubbles.splice(i, 1);
   }
   if (player.inWater) {
+    player.swimBobPhase += 0.07;
     player.bubbleTimer--;
     if (player.bubbleTimer <= 0) {
       player.bubbleTimer = 18 + Math.floor(Math.random() * 20);
@@ -589,7 +591,8 @@ function drawPlayer() {
   const sw = sprite.naturalWidth;
   const sh = sprite.naturalHeight;
   const dashJitter = player.groundDashing ? (Math.random() < 0.15 ? 1 : 0) : 0;
-  const yOffset = (!player.onGround ? S.jumpYOffset : 0) + (player.groundDashing ? S.dashYOffset : 0) + dashJitter;
+  const swimBob = player.inWater ? Math.sin(player.swimBobPhase) * 2 : 0;
+  const yOffset = (!player.onGround ? S.jumpYOffset : 0) + (player.groundDashing ? S.dashYOffset : 0) + dashJitter + swimBob;
   const py = bottom - sh + yOffset;
 
   // flicker during invincibility
