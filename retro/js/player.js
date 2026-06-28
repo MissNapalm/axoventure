@@ -430,7 +430,7 @@ function updatePlayer() {
         player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
       } else {
         // spiked AND not freshly triggered by the player (lastHitBy===null means pre-existing spike)
-        const spiked = (e.shakeTimer > 0 || e.stunTimer > 0) && e.lastHitBy === null;
+        const spiked = e.stunTimer > 0 && e.lastHitBy === null;
         if (spiked) {
           hurtPlayer();
         } else {
@@ -478,7 +478,7 @@ function updatePlayer() {
           hitFreezeTimer = HIT_FREEZE_FRAMES;
           screenShakeTimer = SCREEN_SHAKE_FRAMES;
         } else {
-          const spiked = (e.shakeTimer > 0 || e.stunTimer > 0) && e.lastHitBy === null;
+          const spiked = e.stunTimer > 0 && e.lastHitBy === null;
           if (spiked) {
             hurtPlayer();
           } else {

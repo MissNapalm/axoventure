@@ -856,7 +856,7 @@ function hitBigFishByDash(e, ex, ey) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function hitEnemy(e) {
-  if (e.shakeTimer > 0 || e.stunTimer > 0) return; // invincible in spike mode
+  if (e.stunTimer > 0) return; // invincible only during full spike mode, not the windup shake
   e.hp--;
   e.hitFlash = HIT_FLASH_FRAMES;
   e.hitTextTimer = 40;
