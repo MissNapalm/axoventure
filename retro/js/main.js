@@ -12,6 +12,8 @@ function loop() {
     updatePlayer();
     updateEnemies();
     updateRedEnemies();
+    updateFish();
+    updateBigFish();
     updateLightning();
   }
 
@@ -30,10 +32,13 @@ function loop() {
   drawBg();
   drawLightning();
   drawRain();
+  drawWater();
   drawPlatforms();
   drawNpcs();
   drawEnemies();
   drawRedEnemies();
+  drawFish();
+  drawBigFish();
   drawPlayer();
   drawCarriedRedEnemies();
 

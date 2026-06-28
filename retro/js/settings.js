@@ -19,6 +19,7 @@ const settings = {
   redBounceBack:{ value: 4,     min: 0,    max: 20,   step: 0.5,  label: 'Axo Knockback' },
   redFlipGrav:  { value: 0.49,  min: 0.01, max: 2.0,  step: 0.01, label: 'Red Flip Grav' },
   homingHover:  { value: 12,    min: 0,    max: 60,   step: 1,    label: 'Homing Hover' },
+  stunFrames:   { value: 100,   min: 0,    max: 300,  step: 10,   label: 'Spike Stun Dur' },
 };
 
 // S.gravity instead of settings.gravity.value

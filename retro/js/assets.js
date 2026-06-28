@@ -5,6 +5,7 @@ const required = [
   'cap', 'capy2',
   'badguy1', 'badguy2', 'badguy3',
   'redguy1', 'redguy2',
+  'swim1', 'swim2',
 ];
 let loaded = 0;
 

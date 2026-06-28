@@ -1,5 +1,7 @@
 const PLAYER_START = { x: -100, y: 170 };
 
+let coderMode = false;
+
 const player = {
   x: PLAYER_START.x, y: PLAYER_START.y,
   w: 48, h: 26,
@@ -30,6 +32,9 @@ const player = {
   impactFlash: 0,
   killSpin: 0,
   killText: null, // { text, timer, x, y }
+  inWater: false,
+  bubbles: [],
+  bubbleTimer: 0,
 };
 
 function resetLevel() {
@@ -47,10 +52,29 @@ function resetLevel() {
   player.killText = null;
   player.carrying = null;
   player.groundDashing = false; player.groundDashTimer = 0; player.airDashUsed = false; player.knockbackTimer = 0;
+  player.inWater = false;
+  player.bubbles = [];
+  player.bubbleTimer = 0;
   cameraX = 0;
   cameraY = 0;
   hitFreezeTimer = 0;
   screenShakeTimer = 0;
+  // reset big fish
+  for (const e of bigFishEnemies) {
+    e.x = e.startX; e.y = e.startY;
+    e.vx = 0.5; e.vy = 0;
+    e.hp = 3; e.dead = false; e.deathFlash = 0; e.hitFlash = 0;
+    e.state = 'patrol'; e.stateTimer = 0; e.particles = [];
+    e.bobPhase = Math.random() * Math.PI * 2;
+  }
+  // reset fish
+  for (const e of fishEnemies) {
+    e.x = e.startX; e.y = e.startY;
+    e.vx = 0.7; e.vy = 0;
+    e.hp = 1; e.dead = false;
+    e.hitFlash = 0; e.deathFlash = 0; e.particles = [];
+    e.bobPhase = Math.random() * Math.PI * 2;
+  }
   // reset enemies
   for (const e of enemies) {
     e.x = e.startX;
@@ -66,7 +90,7 @@ function resetLevel() {
 }
 
 function hurtPlayer() {
-  if (player.hurtTimer > 0) return; // invincible
+  if (player.hurtTimer > 0 || coderMode) return;
   player.hp--;
   player.hurtTimer = HURT_FRAMES;
   player.dashing = false; player.dashTarget = null;
@@ -143,6 +167,8 @@ function spawnImpactVFX(x, y) {
 }
 
 function updatePlayer() {
+  if (consumeKey('KeyQ')) coderMode = !coderMode;
+
   // M key: throw if carrying, else dash, else run held
   if (consumeKey('KeyM')) {
     if (dialog.active) {
@@ -159,10 +185,10 @@ function updatePlayer() {
           const dLeft  = keys['KeyS'];
           const dRight = keys['KeyC'];
           const dUp    = keys['KeyD'] || keys['KeyL'];
-          const dDown  = keys['ShiftLeft'] || keys['ShiftRight'];
+          const dDown  = keys['KeyX'];
           const hasAny = dLeft || dRight || dUp || dDown;
           const dx = dRight ? 1 : dLeft ? -1 : (hasAny ? 0 : (player.facingLeft ? -1 : 1));
-          const dy = dUp ? -1 : dDown ? 1 : 0;
+          const dy = dUp ? -1 : (dDown && !player.onGround) ? 1 : 0;
           const len = Math.hypot(dx, dy) || 1;
           const nx = dx / len;
           const ny = dy / len;
@@ -193,20 +219,86 @@ function updatePlayer() {
 
   const left  = keys['KeyS'];
   const right = keys['KeyC'];
+  const up    = keys['KeyD'];
+  const down  = keys['KeyX'];
   const run   = keys['KeyM'];
   const speed = run ? S.walkSpeed * S.runMult : S.walkSpeed;
 
   if (player.knockbackTimer > 0) player.knockbackTimer--;
 
+  // detect water
+  const pcx = player.x + player.w / 2;
+  const pcy = player.y + player.h / 2;
+  player.inWater = (
+    pcx >= WATER_ZONE.x && pcx <= WATER_ZONE.x + WATER_ZONE.w &&
+    pcy >= WATER_ZONE.y && pcy <= WATER_ZONE.y + WATER_ZONE.h
+  );
+
+  // bubble spawning from axo's mouth
+  for (let i = player.bubbles.length - 1; i >= 0; i--) {
+    const b = player.bubbles[i];
+    b.life--;
+    b.y -= b.rise;
+    b.x += Math.sin(b.wobble) * 0.4;
+    b.wobble += 0.12;
+    if (b.life <= 0) player.bubbles.splice(i, 1);
+  }
+  if (player.inWater) {
+    player.bubbleTimer--;
+    if (player.bubbleTimer <= 0) {
+      player.bubbleTimer = 18 + Math.floor(Math.random() * 20);
+      // mouth is near the front of axo's head
+      const mouthX = player.facingLeft
+        ? player.x + 4
+        : player.x + player.w - 4;
+      const mouthY = player.y + 6;
+      const count = Math.random() < 0.4 ? 2 : 1;
+      for (let i = 0; i < count; i++) {
+        player.bubbles.push({
+          x: mouthX + (Math.random() - 0.5) * 4,
+          y: mouthY + (Math.random() - 0.5) * 3,
+          r: 1 + Math.floor(Math.random() * 3), // 1, 2, or 3px radius
+          life: 40 + Math.floor(Math.random() * 30),
+          maxLife: 70,
+          rise: 0.4 + Math.random() * 0.5,
+          wobble: Math.random() * Math.PI * 2,
+        });
+      }
+    }
+  }
+
   player.moving = false;
-  if (!player.groundDashing && player.knockbackTimer === 0) {
+
+  if (player.inWater && !player.groundDashing && !player.dashing && player.homingWindup === 0) {
+    // free swim in any direction
+    const SWIM_SPEED = S.walkSpeed * 1.3;
+    let svx = 0, svy = 0;
+    if (left)  { svx = -SWIM_SPEED; player.facingLeft = true;  player.moving = true; }
+    if (right) { svx =  SWIM_SPEED; player.facingLeft = false; player.moving = true; }
+    if (up)    { svy = -SWIM_SPEED; player.moving = true; }
+    if (down)  { svy =  SWIM_SPEED; player.moving = true; }
+    // diagonal normalise
+    if (svx !== 0 && svy !== 0) { svx *= 0.707; svy *= 0.707; }
+    player.vx += (svx - player.vx) * 0.25;
+    player.vy += (svy - player.vy) * 0.18;
+    // gentle bob when idle
+    if (!player.moving) {
+      player.vy += (0 - player.vy) * 0.12;
+      player.vy += Math.sin(Date.now() * 0.003) * 0.06;
+    }
+    player.onGround = false;
+    player.homingUsed = false;
+    player.airDashUsed = false;
+  } else if (!player.groundDashing && player.knockbackTimer === 0) {
     if (left)       { player.vx = -speed; player.facingLeft = true;  player.moving = true; }
     else if (right) { player.vx =  speed; player.facingLeft = false; player.moving = true; }
     else            { player.vx *= 0.7; }
   }
 
-  const jumpPressed = consumeKey('KeyD') || consumeKey('KeyL');
-  if (jumpPressed && player.onGround) { player.vy = -S.jumpForce; player.onGround = false; }
+  const jumpPressed = player.inWater
+    ? consumeKey('KeyL')
+    : consumeKey('KeyD') || consumeKey('KeyL');
+  if (jumpPressed && player.onGround && !player.inWater) { player.vy = -S.jumpForce; player.onGround = false; }
 
   if (player.hurtTimer > 0) player.hurtTimer--;
 
@@ -231,12 +323,12 @@ function updatePlayer() {
     }
   }
 
-  // Homing attack: one per jump, triggered by fresh jump press while airborne
+  // Homing attack: triggered by jump press while airborne or swimming
   if (!player.onGround && !player.dashing && !player.homingUsed && player.homingWindup === 0 && jumpPressed && !player.wasOnGround) {
     const pcx = player.x + player.w / 2;
     const pcy = player.y + player.h / 2;
     let best = null, bestDist = HOMING_RANGE;
-    for (const e of [...enemies, ...redEnemies]) {
+    for (const e of [...enemies, ...redEnemies, ...fishEnemies, ...bigFishEnemies]) {
       if (e.dead || e.flipped || e.carried) continue;
       const ey = (e._y ? e._y : e.y) + e.h / 2;
       const dist = Math.hypot((e.x + e.w / 2) - pcx, ey - pcy);
@@ -271,7 +363,7 @@ function updatePlayer() {
   for (const t of player.trail) t.life--;
   player.trail = player.trail.filter(t => t.life > 0);
 
-  if (!player.dashing && !player.groundDashing && player.homingWindup === 0) player.vy += S.gravity;
+  if (!player.dashing && !player.groundDashing && player.homingWindup === 0 && !player.inWater) player.vy += S.gravity;
   player.x += player.vx;
   player.y += player.vy;
 
@@ -279,18 +371,23 @@ function updatePlayer() {
   if (player.dashing && player.dashTarget) {
     const e = player.dashTarget;
     const inset = 10;
+    const einset = (e.fish || e.bigFish) ? 0 : inset;
     const px1 = player.x + inset, px2 = player.x + player.w - inset;
     const py1 = player.y + inset, py2 = player.y + player.h - inset;
-    const ex1 = e.x + inset,      ex2 = e.x + e.w - inset;
-    const ey1 = (e._y ? e._y : e.y) + inset;
-    const ey2 = ey1 + e.h - inset * 2;
+    const ex1 = e.x + einset,      ex2 = e.x + e.w - einset;
+    const ey1 = (e._y ? e._y : e.y) + einset;
+    const ey2 = ey1 + e.h - einset * 2;
     const ox = Math.min(px2, ex2) - Math.max(px1, ex1);
     const oy = Math.min(py2, ey2) - Math.max(py1, ey1);
     if (ox > 0 && oy > 0) {
       player.dashing = false; player.dashTarget = null;
       const impactX = e.x + e.w / 2;
       const impactY = (e._y ? e._y : e.y) + e.h / 2;
-      if (e.red) {
+      if (e.bigFish) {
+        hitBigFishByHoming(e, impactX, impactY);
+      } else if (e.fish) {
+        hitFishByHoming(e, impactX, impactY);
+      } else if (e.red) {
         e.dead = true;
         spawnDeathStars(e);
         triggerLightning(Math.round(impactX - cameraX));
@@ -299,7 +396,6 @@ function updatePlayer() {
         player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -S.redBounceBack : S.redBounceBack;
         player.vy = -4;
         hitFreezeTimer = HIT_FREEZE_FRAMES;
-        screenShakeTimer = SCREEN_SHAKE_FRAMES;
         spawnImpactVFX(impactX, impactY);
         player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
       } else if (e.stunTimer > 0) {
@@ -307,12 +403,11 @@ function updatePlayer() {
       } else {
         player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
         player.vy = -4;
-        const wasAlive = !e.dead;
         hitEnemy(e);
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         screenShakeTimer = SCREEN_SHAKE_FRAMES;
         spawnImpactVFX(impactX, impactY);
-        if (e.dead && wasAlive) player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
+        if (e.dead) player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
       }
     }
   }
@@ -322,14 +417,20 @@ function updatePlayer() {
     const inset = 6;
     const px1 = player.x + inset, px2 = player.x + player.w - inset;
     const py1 = player.y + inset, py2 = player.y + player.h - inset;
-    for (const e of [...enemies, ...redEnemies]) {
+    for (const e of [...enemies, ...redEnemies, ...fishEnemies, ...bigFishEnemies]) {
       if (e.dead || e.flipped || e.carried) continue;
       const ex1 = e.x + inset, ex2 = e.x + e.w - inset;
       const ey1 = (e._y ? e._y : e.y) + inset;
       const ey2 = ey1 + e.h - inset * 2;
       if (Math.min(px2, ex2) - Math.max(px1, ex1) > 0 && Math.min(py2, ey2) - Math.max(py1, ey1) > 0) {
         player.groundDashing = false;
-        if (e.red) {
+        if (e.bigFish) {
+          const ex = e.x + e.w / 2, ey = e.y + e.h / 2;
+          hitBigFishByDash(e, ex, ey);
+        } else if (e.fish) {
+          const ex = e.x + e.w / 2, ey = e.y + e.h / 2;
+          hitFishByDash(e, ex, ey);
+        } else if (e.red) {
           flipRedEnemy(e);
           player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -S.redBounceBack : S.redBounceBack;
           player.knockbackTimer = 12;
@@ -340,15 +441,12 @@ function updatePlayer() {
         } else {
           player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
           player.vy = -4;
-          const wasAlive = !e.dead;
+          const ex = e.x + e.w / 2, ey = (e._y ? e._y : e.y) + e.h / 2;
           hitEnemy(e);
           hitFreezeTimer = HIT_FREEZE_FRAMES;
           screenShakeTimer = SCREEN_SHAKE_FRAMES;
-          if (e.dead && wasAlive) {
-            const ex = e.x + e.w / 2, ey = (e._y ? e._y : e.y) + e.h / 2;
-            spawnImpactVFX(ex, ey);
-            player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
-          }
+          spawnImpactVFX(ex, ey);
+          if (e.dead) player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
         }
         break;
       }
@@ -376,7 +474,11 @@ function updatePlayer() {
   cameraY += (targetY - cameraY) * 0.08;
 
   const horizontalDash = player.groundDashing && Math.abs(Math.sin(player.groundDashAngle)) <= 0.3;
-  if (player.moving && player.onGround || horizontalDash) {
+  if (player.inWater) {
+    player.frameTimer++;
+    const swimRate = S.animSpeed;
+    if (player.frameTimer >= swimRate) { player.frameTimer = 0; player.frame = (player.frame + 1) % 2; }
+  } else if (player.moving && player.onGround || horizontalDash) {
     player.frameTimer++;
     if (player.frameTimer >= (horizontalDash ? 3 : S.animSpeed)) { player.frameTimer = 0; player.frame = (player.frame + 1) % WALK_SEQ.length; }
   } else {
@@ -418,7 +520,9 @@ function drawPlayer() {
 
   const standingSpr = sprites['standing'].naturalWidth ? sprites['standing'] : sprites['walk1'];
   let sprite;
-  if (player.dashing) {
+  if (player.inWater && !player.dashing && !player.groundDashing) {
+    sprite = sprites[player.frame % 2 === 0 ? 'swim1' : 'swim2'];
+  } else if (player.dashing) {
     sprite = sprites['walk2'];
     if (player.dashTarget) {
       player.facingLeft = player.dashTarget.x + player.dashTarget.w / 2 < player.x + player.w / 2;
@@ -491,6 +595,49 @@ function drawPlayer() {
   }
 
   ctx.restore();
+
+  // futuristic crosshair on homing target
+  const crossTarget = player.homingWindupTarget || (player.dashing ? player.dashTarget : null);
+  if (crossTarget && !crossTarget.dead) {
+    const tx = Math.round(crossTarget.x + crossTarget.w / 2 - cameraX);
+    const ty = Math.round((crossTarget._y ? crossTarget._y : crossTarget.y) + crossTarget.h / 2 - cameraY);
+    const now2 = Date.now();
+    const spin = (now2 * 0.004) % (Math.PI * 2);
+    const pulse = 0.6 + 0.4 * Math.sin(now2 * 0.015);
+    const r = 10 + crossTarget.w * 0.3;
+    ctx.save();
+    ctx.translate(tx, ty);
+    ctx.rotate(spin);
+    // outer rotating brackets
+    ctx.globalAlpha = pulse * 0.9;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    const bLen = 5, gap = r;
+    for (let q = 0; q < 4; q++) {
+      ctx.save();
+      ctx.rotate(q * Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(gap, -bLen); ctx.lineTo(gap, bLen);
+      ctx.moveTo(gap, 0);     ctx.lineTo(gap + bLen, 0);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // inner fixed crosshair (counter-rotates to stay aligned)
+    ctx.rotate(-spin);
+    ctx.globalAlpha = pulse * 0.7;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    const cs = 3;
+    ctx.beginPath();
+    ctx.moveTo(-cs, 0); ctx.lineTo(cs, 0);
+    ctx.moveTo(0, -cs); ctx.lineTo(0, cs);
+    ctx.stroke();
+    // dot
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(-1, -1, 2, 2);
+    ctx.restore();
+  }
 
   // hover ring: pulses while locked on pre-launch
   if (player.homingWindup > 0 && S.homingHover > 0) {
@@ -586,6 +733,64 @@ function drawPlayer() {
       ctx.lineTo(Math.round(sp.x - cameraX), Math.round(sp.y - cameraY));
       ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  // underwater tint — subtle blue overlay
+  if (player.inWater) {
+    ctx.save();
+    ctx.globalAlpha = 0.13;
+    ctx.fillStyle = '#1a6090';
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.restore();
+  }
+
+  // bubbles from axo's mouth — pixelated circles
+  for (const b of player.bubbles) {
+    const alpha = (b.life / b.maxLife) * 0.85;
+    const bx = Math.round(b.x - cameraX);
+    const by = Math.round(b.y - cameraY);
+    const r = b.r;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    // pixel-circle: draw as filled squares to keep the 16-bit look
+    ctx.fillStyle = '#c8eeff';
+    // outline pixels
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
+        const dist = Math.abs(dx) + Math.abs(dy); // diamond for pixel-art feel
+        if (dist === r || (r > 1 && dist === r - 1 && dx === 0 && dy === 0)) continue;
+        if (dist <= r) {
+          // interior — lighter, more transparent
+          ctx.globalAlpha = alpha * 0.25;
+          ctx.fillStyle = '#e8f8ff';
+          ctx.fillRect(bx + dx, by + dy, 1, 1);
+        }
+      }
+    }
+    // rim pixels
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = '#a0d8f0';
+    if (r === 1) {
+      ctx.fillRect(bx,   by-1, 1, 1);
+      ctx.fillRect(bx,   by+1, 1, 1);
+      ctx.fillRect(bx-1, by,   1, 1);
+      ctx.fillRect(bx+1, by,   1, 1);
+    } else if (r === 2) {
+      ctx.fillRect(bx-1, by-2, 2, 1);
+      ctx.fillRect(bx-1, by+2, 2, 1);
+      ctx.fillRect(bx-2, by-1, 1, 2);
+      ctx.fillRect(bx+2, by-1, 1, 2);
+    } else {
+      ctx.fillRect(bx-1, by-3, 3, 1);
+      ctx.fillRect(bx-1, by+3, 3, 1);
+      ctx.fillRect(bx-3, by-1, 1, 3);
+      ctx.fillRect(bx+3, by-1, 1, 3);
+    }
+    // highlight pixel (top-left of bubble)
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(bx - Math.max(1, r-1), by - Math.max(1, r-1), 1, 1);
     ctx.restore();
   }
 

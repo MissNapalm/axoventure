@@ -41,17 +41,6 @@ const enemies = [
   makeEnemy(680,  650,  720, 140),
   makeEnemy(950,  920, 995,  148),
   makeEnemy(1230, 1200, 1275, 155),
-  // lower section (on ground at LOWER_Y)
-  makeEnemy(2000, 1950, 2090, LOWER_Y),
-  makeEnemy(2180, 2120, 2300, LOWER_Y),
-  makeEnemy(2450, 2400, 2510, LOWER_Y),
-  makeEnemy(2600, 2560, 2660, LOWER_Y),
-  makeEnemy(2750, 2700, 2830, LOWER_Y),
-  makeEnemy(2950, 2900, 3040, LOWER_Y),
-  // lower section floating platform enemies
-  makeEnemy(2110, 2100, 2180, 275),
-  makeEnemy(2530, 2520, 2610, 250),
-  makeEnemy(2810, 2800, 2880, 248),
 ];
 
 function makeRedEnemy(x, patrolLeft, patrolRight, platformY) {
@@ -89,11 +78,6 @@ function makeRedEnemy(x, patrolLeft, patrolRight, platformY) {
 const redEnemies = [
   makeRedEnemy(300, 260, 380, GROUND_Y),
   makeRedEnemy(720, 680, 800, GROUND_Y),
-  // lower section red enemies
-  makeRedEnemy(2080, 2030, 2160, LOWER_Y),
-  makeRedEnemy(2340, 2280, 2420, LOWER_Y),
-  makeRedEnemy(2690, 2640, 2770, LOWER_Y),
-  makeRedEnemy(2870, 2820, 2960, LOWER_Y),
 ];
 
 // called from player.js when homing into a red enemy
@@ -155,7 +139,9 @@ function updateRedEnemies() {
           ne.dead = true; spawnDeathStars(ne);
           e.dead = true; spawnDeathStars(e);
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
+          screenShakeTimer = 6;
           player.carrying = null;
+          player.killText = { text: 'THROW HIT!', timer: 50, x: e.x + e.w / 2, y: e.y - 12 };
           break;
         }
       }
@@ -190,6 +176,8 @@ function updateRedEnemies() {
           ne.dead = true; spawnDeathStars(ne);
           e.dead  = true; spawnDeathStars(e);
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
+          screenShakeTimer = 6;
+          player.killText = { text: 'THROW HIT!', timer: 50, x: e.x + e.w / 2, y: e._y - 12 };
           break;
         }
       }
@@ -241,10 +229,20 @@ function updateRedEnemies() {
     if (e.x + e.w >= e.patrolRight) { e.x = e.patrolRight - e.w; e.vx = -Math.abs(e.vx); }
 
     // contact with player: dashing/homing flips them, walking hurts Axo
-    if (!player.dashing && !player.groundDashing && player.hurtTimer === 0) {
+    if (!player.dashing && !player.groundDashing) {
       const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
       const oy = Math.min(player.y + player.h, e.y + e.h) - Math.max(player.y, e.y);
-      if (ox > 0 && oy > 0) hurtPlayer();
+      if (ox > 0 && oy > 0) {
+        // push player out
+        if (ox < oy) {
+          player.x += player.x + player.w / 2 < e.x + e.w / 2 ? -ox : ox;
+          player.vx = 0;
+        } else {
+          player.y += player.y + player.h / 2 < e.y + e.h / 2 ? -oy : oy;
+          player.vy = 0;
+        }
+        if (player.hurtTimer === 0) hurtPlayer();
+      }
     }
   }
 }
@@ -367,6 +365,478 @@ function spawnDeathStars(e) {
   }
 }
 
+// ── Fish enemies ─────────────────────────────────────────────────────────────
+
+function makeFish(x, y, swimLeft, swimRight) {
+  return {
+    fish: true,
+    x, startX: x,
+    y, startY: y,
+    w: 20, h: 10,
+    vx: 0.7, vy: 0,
+    swimLeft, swimRight,
+    bobPhase: Math.random() * Math.PI * 2,
+    hp: 1,
+    dead: false,
+    hitFlash: 0,
+    deathFlash: 0,
+    particles: [],
+  };
+}
+
+const fishEnemies = [
+  makeFish(1900, 380, 1800, 2000),
+  makeFish(2050, 450, 1950, 2200),
+  makeFish(2250, 340, 2100, 2400),
+  makeFish(2420, 500, 2300, 2550),
+  makeFish(2600, 390, 2480, 2720),
+  makeFish(2780, 460, 2650, 2900),
+  makeFish(2950, 350, 2820, 3080),
+  makeFish(1850, 560, 1750, 2050),
+  makeFish(2150, 620, 2000, 2350),
+  makeFish(2500, 580, 2380, 2650),
+  makeFish(2750, 640, 2600, 2900),
+];
+
+function updateFish() {
+  for (const e of fishEnemies) {
+    for (const p of e.particles) p.life--;
+    e.particles = e.particles.filter(p => p.life > 0);
+
+    if (e.hitFlash > 0) e.hitFlash--;
+    if (e.deathFlash > 0) e.deathFlash--;
+
+    if (e.dead) {
+      // respawn when player moves away
+      if (Math.abs(e.startX - (player.x + player.w / 2)) > VIEW_W) {
+        e.x = e.startX; e.y = e.startY;
+        e.vx = 0.7; e.vy = 0;
+        e.hp = 1; e.dead = false;
+        e.hitFlash = 0; e.deathFlash = 0; e.particles = [];
+      }
+      continue;
+    }
+
+    // sine-wave bob
+    e.bobPhase += 0.05;
+    e.y = e.startY + Math.sin(e.bobPhase) * 8;
+
+    // horizontal patrol
+    e.x += e.vx;
+    if (e.x <= e.swimLeft)             { e.x = e.swimLeft;         e.vx =  Math.abs(e.vx); }
+    if (e.x + e.w >= e.swimRight)      { e.x = e.swimRight - e.w;  e.vx = -Math.abs(e.vx); }
+
+    // hurt player on contact unless dashing/homing
+    if (!player.dashing && !player.groundDashing && player.hurtTimer === 0) {
+      const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
+      const oy = Math.min(player.y + player.h, e.y + e.h) - Math.max(player.y, e.y);
+      if (ox > 0 && oy > 0) hurtPlayer();
+    }
+  }
+}
+
+function drawFish() {
+  for (const e of fishEnemies) {
+    drawParticles(e.particles);
+    if (e.dead && e.deathFlash <= 0) continue;
+
+    const sx = Math.round(e.x - cameraX);
+    const sy = Math.round(e.y - cameraY);
+    const facingRight = e.vx > 0;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+
+    // white flash on hit/death
+    const flashColor = (e.deathFlash > 0) ? 1 : (e.hitFlash > 0 ? e.hitFlash / HIT_FLASH_FRAMES : 0);
+
+    ctx.translate(sx + e.w / 2, sy + e.h / 2);
+    if (!facingRight) ctx.scale(-1, 1);
+
+    // draw pixel fish body
+    const d = ctx.createImageData(e.w, e.h);
+    const px = d.data;
+    // pixel layout (20×10): body=cyan-blue, fin=lighter, tail=darker, eye=white/black
+    const body  = flashColor > 0 ? [255,255,255,255] : [40, 160, 200, 255];
+    const fin   = flashColor > 0 ? [255,255,255,255] : [60, 200, 230, 255];
+    const tail  = flashColor > 0 ? [255,255,255,255] : [20, 110, 160, 255];
+    const eye   = flashColor > 0 ? [255,255,255,255] : [255, 255, 255, 255];
+    const pupil = flashColor > 0 ? [255,255,255,255] : [10,  10,  10,  255];
+    const set = (x2, y2, c) => {
+      if (x2 < 0 || x2 >= e.w || y2 < 0 || y2 >= e.h) return;
+      const i = (y2 * e.w + x2) * 4;
+      px[i]=c[0]; px[i+1]=c[1]; px[i+2]=c[2]; px[i+3]=c[3];
+    };
+    // tail (left side, x 0-3)
+    for (let y2 = 2; y2 <= 7; y2++) { set(0, y2, tail); set(1, y2, tail); }
+    set(0, 1, tail); set(0, 8, tail);
+    set(1, 1, tail); set(1, 8, tail);
+    // body (x 2-15)
+    for (let x2 = 2; x2 <= 15; x2++) {
+      const top = x2 < 8 ? 2 : x2 < 12 ? 1 : 2;
+      const bot = x2 < 8 ? 7 : x2 < 12 ? 8 : 7;
+      for (let y2 = top; y2 <= bot; y2++) set(x2, y2, body);
+    }
+    // dorsal fin (x 5-9, y 0-1)
+    for (let x2 = 5; x2 <= 9; x2++) { set(x2, 0, fin); set(x2, 1, fin); }
+    // head bump (x 13-17)
+    for (let x2 = 13; x2 <= 17; x2++) {
+      const top = x2 < 16 ? 1 : 2;
+      const bot = x2 < 16 ? 8 : 7;
+      for (let y2 = top; y2 <= bot; y2++) set(x2, y2, fin);
+    }
+    // nose tip
+    set(18, 3, fin); set(18, 4, fin); set(18, 5, fin); set(18, 6, fin);
+    set(19, 4, fin); set(19, 5, fin);
+    // eye
+    set(15, 3, eye); set(16, 3, eye);
+    set(15, 4, eye); set(16, 4, eye);
+    set(15, 3, pupil);
+
+    // create offscreen canvas from pixel data
+    const oc = document.createElement('canvas');
+    oc.width = e.w; oc.height = e.h;
+    oc.getContext('2d').putImageData(d, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(oc, -e.w / 2, -e.h / 2, e.w, e.h);
+
+    ctx.restore();
+  }
+}
+
+function hitFish(e) {
+  e.hp--;
+  e.hitFlash = HIT_FLASH_FRAMES;
+  if (e.hp <= 0) {
+    e.deathFlash = 5;
+    e.dead = true;
+    spawnDeathStars(e);
+    triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
+    screenShakeTimer = 6;
+    if (player.dashing || player.groundDashing) player.killSpin = 10;
+  }
+}
+
+function hitFishByHoming(e, impactX, impactY) {
+  e.dead = true;
+  e.deathFlash = 5;
+  spawnDeathStars(e);
+  triggerLightning(Math.round(impactX - cameraX));
+  screenShakeTimer = 6;
+  player.killSpin = 10;
+  player.vx = player.x + player.w / 2 < impactX ? -S.redBounceBack : S.redBounceBack;
+  player.vy = -3;
+  hitFreezeTimer = HIT_FREEZE_FRAMES;
+  spawnImpactVFX(impactX, impactY);
+  player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
+}
+
+function hitFishByDash(e, ex, ey) {
+  e.dead = true;
+  e.deathFlash = 5;
+  spawnDeathStars(e);
+  triggerLightning(Math.round(ex - cameraX));
+  screenShakeTimer = 6;
+  player.killSpin = 10;
+  hitFreezeTimer = HIT_FREEZE_FRAMES;
+  spawnImpactVFX(ex, ey);
+  player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
+}
+
+// ── Big Fish enemies ──────────────────────────────────────────────────────────
+// States: 'patrol' → 'windup' (invincible, telegraphs charge) → 'rush' → 'cooldown' → 'patrol'
+
+const BIG_FISH_W = 28;
+const BIG_FISH_H = 15;
+const WINDUP_FRAMES  = 90;  // stun/telegraph duration
+const RUSH_SPEED     = 9;
+const RUSH_FRAMES    = 22;
+const COOLDOWN_FRAMES = 60;
+const PATROL_TRIGGER_DIST = 130; // how close player must be to trigger windup
+
+function makeBigFish(x, y, swimLeft, swimRight) {
+  return {
+    bigFish: true,
+    x, startX: x,
+    y, startY: y,
+    w: BIG_FISH_W, h: BIG_FISH_H,
+    vx: 0.5, vy: 0,
+    swimLeft, swimRight,
+    bobPhase: Math.random() * Math.PI * 2,
+    state: 'patrol', // 'patrol' | 'windup' | 'rush' | 'cooldown'
+    stateTimer: 0,
+    rushVx: 0, rushVy: 0,
+    hp: 3,
+    dead: false,
+    deathFlash: 0,
+    hitFlash: 0,
+    particles: [],
+  };
+}
+
+const bigFishEnemies = [
+  makeBigFish(2000, 420, 1870, 2130),
+  makeBigFish(2300, 500, 2170, 2450),
+  makeBigFish(2650, 370, 2500, 2800),
+  makeBigFish(3000, 480, 2860, 3150),
+];
+
+function updateBigFish() {
+  for (const e of bigFishEnemies) {
+    for (const p of e.particles) p.life--;
+    e.particles = e.particles.filter(p => p.life > 0);
+
+    if (e.deathFlash > 0) e.deathFlash--;
+    if (e.hitFlash > 0) e.hitFlash--;
+
+    if (e.dead) {
+      if (Math.abs(e.startX - (player.x + player.w / 2)) > VIEW_W) {
+        e.x = e.startX; e.y = e.startY;
+        e.vx = 0.5; e.vy = 0;
+        e.hp = 3; e.dead = false; e.deathFlash = 0; e.hitFlash = 0;
+        e.state = 'patrol'; e.stateTimer = 0; e.particles = [];
+        e.bobPhase = Math.random() * Math.PI * 2;
+      }
+      continue;
+    }
+
+    const pcx = player.x + player.w / 2;
+    const pcy = player.y + player.h / 2;
+    const ecx = e.x + e.w / 2;
+    const ecy = e.y + e.h / 2;
+    const dist = Math.hypot(pcx - ecx, pcy - ecy);
+
+    if (e.state === 'patrol') {
+      e.bobPhase += 0.04;
+      e.y = e.startY + Math.sin(e.bobPhase) * 10;
+      e.x += e.vx;
+      if (e.x <= e.swimLeft)           { e.x = e.swimLeft;         e.vx =  Math.abs(e.vx); }
+      if (e.x + e.w >= e.swimRight)    { e.x = e.swimRight - e.w;  e.vx = -Math.abs(e.vx); }
+
+
+    } else if (e.state === 'windup') {
+      // hold position, shake slightly, face player
+      e.bobPhase += 0.15;
+      e.y += Math.sin(e.bobPhase) * 0.8;
+      e.vx = pcx > ecx ? 0.01 : -0.01; // just for facing direction
+      e.stateTimer--;
+      if (e.stateTimer <= 0) {
+        // lock in rush direction toward player
+        const angle = Math.atan2(pcy - ecy, pcx - ecx);
+        e.rushVx = Math.cos(angle) * RUSH_SPEED;
+        e.rushVy = Math.sin(angle) * RUSH_SPEED;
+        e.vx = e.rushVx;
+        e.state = 'rush';
+        e.stateTimer = RUSH_FRAMES;
+      }
+
+    } else if (e.state === 'rush') {
+      e.x += e.rushVx;
+      e.y += e.rushVy;
+      e.stateTimer--;
+
+      // contact during rush always hurts — player must dash away
+      const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
+      const oy = Math.min(player.y + player.h, e.y + e.h) - Math.max(player.y, e.y);
+      if (ox > 0 && oy > 0) {
+        // knock player back hard
+        player.vx = player.x + player.w / 2 < ecx ? -6 : 6;
+        player.vy = player.y + player.h / 2 < ecy ? -4 : 4;
+        player.knockbackTimer = 18;
+        hurtPlayer();
+        e.state = 'cooldown';
+        e.stateTimer = COOLDOWN_FRAMES;
+        e.rushVx = 0; e.rushVy = 0;
+      }
+
+      if (e.stateTimer <= 0) {
+        e.state = 'cooldown';
+        e.stateTimer = COOLDOWN_FRAMES;
+        e.rushVx = 0; e.rushVy = 0;
+      }
+
+    } else if (e.state === 'cooldown') {
+      // drift to a stop
+      e.x += e.vx * 0.85;
+      e.vx *= 0.85;
+      e.y += e.vy;
+      e.vy *= 0.85;
+      e.bobPhase += 0.04;
+      e.stateTimer--;
+      if (e.stateTimer <= 0) {
+        e.state = 'patrol';
+        e.vx = 0.5;
+        e.startY = e.y;
+        // re-anchor patrol range around current position so it doesn't snap
+        e.swimLeft  = e.x - 80;
+        e.swimRight = e.x + 80 + e.w;
+      }
+    }
+
+    // contact during patrol: push player out so they can't clip through
+    if (e.state === 'patrol' && !player.dashing && !player.groundDashing) {
+      const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
+      const oy = Math.min(player.y + player.h, e.y + e.h) - Math.max(player.y, e.y);
+      if (ox > 0 && oy > 0) {
+        if (ox < oy) {
+          player.x += player.x + player.w / 2 < e.x + e.w / 2 ? -ox : ox;
+          player.vx = 0;
+        } else {
+          player.y += player.y + player.h / 2 < e.y + e.h / 2 ? -oy : oy;
+          player.vy = 0;
+        }
+        if (player.hurtTimer === 0) hurtPlayer();
+      }
+    }
+  }
+}
+
+function drawBigFish() {
+  for (const e of bigFishEnemies) {
+    drawParticles(e.particles);
+    if (e.dead && e.deathFlash <= 0) continue;
+
+    const sx = Math.round(e.x - cameraX);
+    const sy = Math.round(e.y - cameraY);
+    const facingRight = e.vx >= 0;
+    const W = e.w, H = e.h;
+
+    const isWindup  = e.state === 'windup';
+    const isRush    = e.state === 'rush';
+    const flash = e.deathFlash > 0;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.translate(sx + W / 2, sy + H / 2);
+    if (!facingRight) ctx.scale(-1, 1);
+
+    // rush: motion lines behind fish
+    if (isRush) {
+      ctx.save();
+      ctx.strokeStyle = '#ff6600';
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 4; i++) {
+        const lx = -W * 0.5 - i * 4;
+        const ly = -H * 0.3 + i * (H * 0.2);
+        const len = 4 + i * 2;
+        ctx.globalAlpha = 0.7 - i * 0.15;
+        ctx.beginPath();
+        ctx.moveTo(lx, ly);
+        ctx.lineTo(lx - len, ly);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // SNES-style pixel fish — exactly 28 wide × 15 tall
+    // facing right: tail=left (col 0), head=right (col 27)
+    const C = {
+      K: flash ? [255,255,255,255] : [0,0,0,255],           // outline/dark
+      D: flash ? [255,255,255,255] : isWindup||isRush ? [150,40,0,255]   : [15,80,130,255],  // dark body
+      M: flash ? [255,255,255,255] : isWindup||isRush ? [210,80,10,255]  : [40,140,190,255], // mid body
+      L: flash ? [255,255,255,255] : isWindup||isRush ? [240,130,40,255] : [80,190,230,255], // light body
+      B: flash ? [255,255,255,255] : isWindup||isRush ? [255,180,90,255] : [160,225,245,255],// belly
+      E: flash ? [255,255,255,255] : [255,255,255,255],      // eye white
+      P: flash ? [255,255,255,255] : [10,10,10,255],         // pupil
+    };
+    // 28×15 map — each string must be exactly 28 chars
+    const map = [
+      'KK..........KKK.............',  // row 0  tail top prong + dorsal base
+      '.KK.......KMMKK.............',  // row 1
+      '..KK.....KMMMMLKK...........',  // row 2  dorsal fin
+      'K..KK...KDDMMMLLKK..........',  // row 3
+      'KK..KKKKDDDMMMLLLLKK........',  // row 4
+      '.KK.KDDDDDMMMBBLLLKKK.......',  // row 5
+      '..KKDDDDDDMMMBBLLLLKEPKKK...',  // row 6  eye row
+      '..KKDDDDDDMMMBBLLLKKEPKLKK..',  // row 7  mouth row
+      '..KKDDDDDDMMMBBLLLLKKKKLKK..',  // row 8
+      '.KK.KDDDDDDMMMBBLLLKKKKK...',   // row 9  — 28 chars
+      'KK..KKKKDDDDMMMLLLLKK.......',  // row 10
+      'K..KK...KDDMMMLLLKK.........',  // row 11
+      '..KK.....KMMMLKKK...........',  // row 12 ventral fin
+      '.KK.......KMMKK.............',  // row 13
+      'KK..........KK..............',  // row 14 tail bottom prong
+    ];
+    const d = ctx.createImageData(W, H);
+    const px2 = d.data;
+    for (let row = 0; row < H; row++) {
+      const rowStr = map[row] || '';
+      for (let col = 0; col < W; col++) {
+        const ch = rowStr[col] || '.';
+        const color = C[ch] || null;
+        if (!color) continue;
+        const i = (row * W + col) * 4;
+        px2[i]=color[0]; px2[i+1]=color[1]; px2[i+2]=color[2]; px2[i+3]=color[3];
+      }
+    }
+    // hitFlash tint overlay
+    const oc2 = document.createElement('canvas');
+    oc2.width = W; oc2.height = H;
+    const oc2d = oc2.getContext('2d');
+    oc2d.putImageData(d, 0, 0);
+    if (e.hitFlash > 0 && !flash) {
+      oc2d.globalCompositeOperation = 'source-atop';
+      oc2d.globalAlpha = e.hitFlash / HIT_FLASH_FRAMES * 0.8;
+      oc2d.fillStyle = '#ffffff';
+      oc2d.fillRect(0, 0, W, H);
+    }
+    ctx.drawImage(oc2, -W/2, -H/2, W, H);
+
+    ctx.restore();
+
+    // warning exclamation during windup
+    if (isWindup) {
+      const pulse = Math.floor(Date.now() / 120) % 2 === 0;
+      if (pulse) {
+        ctx.save();
+        ctx.font = PIXEL_FONT;
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ff4400';
+        ctx.fillText('!', sx + W / 2, sy - 4);
+        ctx.restore();
+      }
+    }
+  }
+}
+
+function damageBigFish(e, impactX, impactY, text, bounceBack) {
+  e.hp--;
+  e.hitFlash = HIT_FLASH_FRAMES;
+  hitFreezeTimer = HIT_FREEZE_FRAMES;
+  spawnImpactVFX(impactX, impactY);
+  screenShakeTimer = 4;
+  if (bounceBack) {
+    player.vx = player.x + player.w / 2 < impactX ? -S.redBounceBack : S.redBounceBack;
+    player.vy = -3;
+  }
+  if (e.hp <= 0) {
+    e.dead = true;
+    e.deathFlash = 5;
+    spawnDeathStars(e);
+    triggerLightning(Math.round(impactX - cameraX));
+    screenShakeTimer = 6;
+    player.killSpin = 10;
+    player.killText = { text, timer: 50, x: impactX, y: impactY - 12 };
+  } else {
+    // still alive — re-enter windup to charge again
+    e.state = 'windup';
+    e.stateTimer = WINDUP_FRAMES;
+    e.vx = 0; e.rushVx = 0; e.rushVy = 0;
+  }
+}
+
+function hitBigFishByHoming(e, impactX, impactY) {
+  if (e.state === 'windup' || e.state === 'rush') return;
+  damageBigFish(e, impactX, impactY, 'HOMING HIT!', true);
+}
+
+function hitBigFishByDash(e, ex, ey) {
+  if (e.state === 'windup' || e.state === 'rush') return;
+  damageBigFish(e, ex, ey, 'DASH HIT!', false);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 function hitEnemy(e) {
   e.hp--;
   e.hitFlash = HIT_FLASH_FRAMES;
@@ -411,7 +881,7 @@ function updateEnemies() {
     if (e.hitFlash > 0) e.hitFlash--;
     if (e.shakeTimer > 0) {
       e.shakeTimer--;
-      if (e.shakeTimer === 0) e.stunTimer = STUN_FRAMES;
+      if (e.shakeTimer === 0) e.stunTimer = S.stunFrames;
       continue;
     }
     if (e.stunTimer > 0) {

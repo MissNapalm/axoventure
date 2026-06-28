@@ -24,4 +24,15 @@ function drawHUD() {
   for (let i = 0; i < PLAYER_MAX_HP; i++) {
     drawHeart(6 + i * 10, VIEW_H - 14, i < player.hp);
   }
+
+  // coder mode indicator
+  if (coderMode) {
+    ctx.font = PIXEL_FONT_SM;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(VIEW_W - 82, VIEW_H - 14, 78, 10);
+    ctx.fillStyle = '#00ffaa';
+    ctx.textAlign = 'right';
+    ctx.fillText('CODER MODE', VIEW_W - 4, VIEW_H - 5);
+    ctx.textAlign = 'left';
+  }
 }

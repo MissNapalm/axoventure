@@ -3,7 +3,10 @@ let cameraY = 0;
 let hitFreezeTimer = 0;
 let screenShakeTimer = 0;
 
-const LOWER_Y = 310; // lower ground level after capybaras
+// Water zone: player swims freely inside this rectangle
+const WATER_ZONE = { x: 1700, y: 230, w: 2500, h: 600 };
+// The seafloor/rock shelf that closes the bottom
+const WATER_FLOOR_Y = WATER_ZONE.y + WATER_ZONE.h;
 
 const platforms = [
   // upper ground (original section)
@@ -19,20 +22,21 @@ const platforms = [
   { x: 1060, y: 125, w: 75,  h: 8,  color: '#5c3d2e', oneWay: true },
   { x: 1200, y: 155, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
   { x: 1340, y: 130, w: 90,  h: 8,  color: '#5c3d2e', oneWay: true },
-  // step-down transition platforms (after capybaras ~x:1700)
+  // step-down ledges leading into the water
   { x: 1700, y: 235, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
   { x: 1820, y: 260, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 1940, y: 285, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
-  // lower ground section
-  { x: 1700, y: LOWER_Y, w: 2400, h: 400, color: '#2b1a10' },
-  // lower section floating platforms
-  { x: 2100, y: 275, w: 80,  h: 8,  color: '#4a2e1e', oneWay: true },
-  { x: 2240, y: 255, w: 75,  h: 8,  color: '#4a2e1e', oneWay: true },
-  { x: 2380, y: 270, w: 80,  h: 8,  color: '#4a2e1e', oneWay: true },
-  { x: 2520, y: 250, w: 90,  h: 8,  color: '#4a2e1e', oneWay: true },
-  { x: 2660, y: 265, w: 75,  h: 8,  color: '#4a2e1e', oneWay: true },
-  { x: 2800, y: 248, w: 80,  h: 8,  color: '#4a2e1e', oneWay: true },
-  { x: 2940, y: 270, w: 85,  h: 8,  color: '#4a2e1e', oneWay: true },
+  // seafloor solid rock — closes the bottom of the water zone
+  { x: WATER_ZONE.x, y: WATER_FLOOR_Y, w: WATER_ZONE.w, h: 80, color: '#1a1a2e' },
+  // underwater rock shelves / ledges
+  { x: 1850, y: 620, w: 120, h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 2050, y: 560, w: 100, h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 2220, y: 500, w: 110, h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 2400, y: 570, w: 90,  h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 2580, y: 520, w: 100, h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 2760, y: 590, w: 110, h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 2940, y: 540, w: 90,  h: 8,  color: '#1e2a3a', oneWay: true },
+  // right wall closing the water zone
+  { x: WATER_ZONE.x + WATER_ZONE.w, y: WATER_ZONE.y, w: 40, h: WATER_ZONE.h + 80, color: '#1a1a2e' },
 ];
 
 const WORLD_W = 4200;
@@ -57,6 +61,66 @@ const raindrops = Array.from({ length: 60 }, () => ({
   len:   Math.floor(Math.random() * 3) + 2,
   speed: Math.floor(Math.random() * 2) + 2,
 }));
+
+function drawWater() {
+  const wx = Math.round(WATER_ZONE.x - cameraX);
+  const wy = Math.round(WATER_ZONE.y - cameraY);
+  const ww = WATER_ZONE.w;
+  const wh = WATER_ZONE.h;
+
+  // deep water fill
+  const grad = ctx.createLinearGradient(wx, wy, wx, wy + wh);
+  grad.addColorStop(0,   'rgba(20,80,140,0.82)');
+  grad.addColorStop(0.5, 'rgba(8,40,90,0.90)');
+  grad.addColorStop(1,   'rgba(4,18,50,0.97)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(wx, wy, ww, wh);
+
+  // surface shimmer lines
+  const t = Date.now() * 0.001;
+  ctx.save();
+  ctx.globalAlpha = 0.35;
+  ctx.strokeStyle = '#7ec8e3';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 6; i++) {
+    const phase = (t * 0.6 + i * 1.1) % 1;
+    const lineY = wy + phase * 14;
+    const lineX = wx + (i * 43) % ww;
+    ctx.beginPath();
+    ctx.moveTo(lineX, lineY);
+    ctx.lineTo(lineX + 22 + Math.sin(t + i) * 6, lineY);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // bubbles drifting upward
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  ctx.fillStyle = '#a0e0ff';
+  const bSeed = Math.floor(t * 0.5);
+  for (let i = 0; i < 14; i++) {
+    const bx = wx + ((i * 179 + bSeed * 37) % ww);
+    const by = wy + wh - ((t * 20 + i * 47) % wh);
+    const br = 1 + (i % 3);
+    ctx.beginPath();
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // caustic light patches on the surface band
+  ctx.save();
+  ctx.globalAlpha = 0.10;
+  ctx.fillStyle = '#c0f0ff';
+  for (let i = 0; i < 8; i++) {
+    const cx2 = wx + (i * 311 + Math.floor(t * 30) * 7) % ww;
+    const cy2 = wy + 4 + (Math.sin(t * 1.2 + i) * 0.5 + 0.5) * 20;
+    ctx.beginPath();
+    ctx.ellipse(cx2, cy2, 10 + Math.sin(t + i) * 4, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
 
 function drawBg() {
   const grad = ctx.createLinearGradient(0, 0, 0, VIEW_H);
