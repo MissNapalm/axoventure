@@ -155,9 +155,10 @@ function updatePlayer() {
           const dRight = keys['KeyC'];
           const dUp    = keys['KeyD'] || keys['KeyL'];
           const dDown  = keys['ShiftLeft'] || keys['ShiftRight'];
-          const dx = dRight ? 1 : dLeft ? -1 : (player.facingLeft ? -1 : 1);
+          const hasAny = dLeft || dRight || dUp || dDown;
+          const dx = dRight ? 1 : dLeft ? -1 : (hasAny ? 0 : (player.facingLeft ? -1 : 1));
           const dy = dUp ? -1 : dDown ? 1 : 0;
-          const len = Math.hypot(dx, dy);
+          const len = Math.hypot(dx, dy) || 1;
           const nx = dx / len;
           const ny = dy / len;
           player.groundDashing = true;
@@ -493,7 +494,15 @@ function drawPlayer() {
     }
   }
 
-  if (player.impactFlash > 0) player.impactFlash--;
+  if (player.impactFlash > 0) {
+    player.impactFlash--;
+    const ft = player.impactFlash / 10;
+    ctx.save();
+    ctx.globalAlpha = ft * 0.28;
+    ctx.fillStyle = '#ffe8a0';
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.restore();
+  }
 
   // shockwave rings expanding outward from impact
   for (let i = player.shockwaves.length - 1; i >= 0; i--) {
