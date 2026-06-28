@@ -20,6 +20,7 @@ const player = {
   carrying: null,
   groundDashing: false,
   groundDashTimer: 0,
+  groundDashAngle: 0,
   airDashUsed: false,
   knockbackTimer: 0,
   homingWindup: 0,
@@ -165,6 +166,7 @@ function updatePlayer() {
           const ny = dy / len;
           player.groundDashing = true;
           player.groundDashTimer = GROUND_DASH_FRAMES;
+          player.groundDashAngle = Math.atan2(ny, nx);
           player.vx = nx * GROUND_DASH_SPEED;
           player.vy = ny * GROUND_DASH_SPEED;
           player.facingLeft = nx < 0;
@@ -459,6 +461,21 @@ function drawPlayer() {
       ctx.scale(-1, 1);
     } else {
       ctx.rotate(snapped + Math.PI);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(drawSpr, -sw / 2, -sh / 2, sw, sh);
+  } else if (player.groundDashing && Math.abs(Math.sin(player.groundDashAngle)) > 0.1) {
+    // angled ground dash — rotate sprite to face dash direction
+    const pcx = player.x + player.w / 2 - cameraX;
+    const pcy = player.y + player.h / 2 - cameraY;
+    const angle = player.groundDashAngle;
+    ctx.translate(pcx, pcy);
+    // flip if going left half
+    if (Math.cos(angle) < 0) {
+      ctx.scale(-1, 1);
+      ctx.rotate(-angle);
+    } else {
+      ctx.rotate(angle);
       ctx.scale(-1, 1);
     }
     ctx.drawImage(drawSpr, -sw / 2, -sh / 2, sw, sh);
