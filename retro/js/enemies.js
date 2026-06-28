@@ -478,51 +478,50 @@ function drawFish() {
     ctx.translate(sx + e.w / 2, sy + e.h / 2);
     if (!facingRight) ctx.scale(-1, 1);
 
-    // draw pixel fish body
-    const d = ctx.createImageData(e.w, e.h);
-    const px = d.data;
-    // pixel layout (20×10): body=cyan-blue, fin=lighter, tail=darker, eye=white/black
-    const body  = flashColor > 0 ? [255,255,255,255] : [40, 160, 200, 255];
-    const fin   = flashColor > 0 ? [255,255,255,255] : [60, 200, 230, 255];
-    const tail  = flashColor > 0 ? [255,255,255,255] : [20, 110, 160, 255];
-    const eye   = flashColor > 0 ? [255,255,255,255] : [255, 255, 255, 255];
-    const pupil = flashColor > 0 ? [255,255,255,255] : [10,  10,  10,  255];
-    const set = (x2, y2, c) => {
-      if (x2 < 0 || x2 >= e.w || y2 < 0 || y2 >= e.h) return;
-      const i = (y2 * e.w + x2) * 4;
-      px[i]=c[0]; px[i+1]=c[1]; px[i+2]=c[2]; px[i+3]=c[3];
-    };
-    // tail (left side, x 0-3)
-    for (let y2 = 2; y2 <= 7; y2++) { set(0, y2, tail); set(1, y2, tail); }
-    set(0, 1, tail); set(0, 8, tail);
-    set(1, 1, tail); set(1, 8, tail);
-    // body (x 2-15)
-    for (let x2 = 2; x2 <= 15; x2++) {
-      const top = x2 < 8 ? 2 : x2 < 12 ? 1 : 2;
-      const bot = x2 < 8 ? 7 : x2 < 12 ? 8 : 7;
-      for (let y2 = top; y2 <= bot; y2++) set(x2, y2, body);
+    // build normal fish canvas once per fish object
+    if (!e._oc) {
+      e._oc = getOC('fish_px_' + fishEnemies.indexOf(e), e.w, e.h);
+      const d = e._oc._ctx.createImageData(e.w, e.h);
+      const px = d.data;
+      const B = [40,160,200,255], F = [60,200,230,255], T = [20,110,160,255];
+      const EY = [255,255,255,255], PU = [10,10,10,255];
+      const set = (x2, y2, c) => {
+        if (x2 < 0 || x2 >= e.w || y2 < 0 || y2 >= e.h) return;
+        const i = (y2 * e.w + x2) * 4;
+        px[i]=c[0]; px[i+1]=c[1]; px[i+2]=c[2]; px[i+3]=c[3];
+      };
+      for (let y2 = 2; y2 <= 7; y2++) { set(0,y2,T); set(1,y2,T); }
+      set(0,1,T); set(0,8,T); set(1,1,T); set(1,8,T);
+      for (let x2 = 2; x2 <= 15; x2++) {
+        const top = x2 < 8 ? 2 : x2 < 12 ? 1 : 2;
+        const bot = x2 < 8 ? 7 : x2 < 12 ? 8 : 7;
+        for (let y2 = top; y2 <= bot; y2++) set(x2,y2,B);
+      }
+      for (let x2 = 5; x2 <= 9; x2++) { set(x2,0,F); set(x2,1,F); }
+      for (let x2 = 13; x2 <= 17; x2++) {
+        const top = x2 < 16 ? 1 : 2, bot = x2 < 16 ? 8 : 7;
+        for (let y2 = top; y2 <= bot; y2++) set(x2,y2,F);
+      }
+      set(18,3,F); set(18,4,F); set(18,5,F); set(18,6,F);
+      set(19,4,F); set(19,5,F);
+      set(15,3,EY); set(16,3,EY); set(15,4,EY); set(16,4,EY);
+      set(15,3,PU);
+      e._oc._ctx.putImageData(d, 0, 0);
     }
-    // dorsal fin (x 5-9, y 0-1)
-    for (let x2 = 5; x2 <= 9; x2++) { set(x2, 0, fin); set(x2, 1, fin); }
-    // head bump (x 13-17)
-    for (let x2 = 13; x2 <= 17; x2++) {
-      const top = x2 < 16 ? 1 : 2;
-      const bot = x2 < 16 ? 8 : 7;
-      for (let y2 = top; y2 <= bot; y2++) set(x2, y2, fin);
-    }
-    // nose tip
-    set(18, 3, fin); set(18, 4, fin); set(18, 5, fin); set(18, 6, fin);
-    set(19, 4, fin); set(19, 5, fin);
-    // eye
-    set(15, 3, eye); set(16, 3, eye);
-    set(15, 4, eye); set(16, 4, eye);
-    set(15, 3, pupil);
 
-    // reuse shared fish canvas (all fish are same size)
-    const oc = getOC('fish_px', e.w, e.h);
-    oc._ctx.putImageData(d, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(oc, -e.w / 2, -e.h / 2, e.w, e.h);
+    if (flashColor > 0) {
+      const woc = getOC('fish_flash', e.w, e.h);
+      woc._ctx.clearRect(0, 0, e.w, e.h);
+      woc._ctx.drawImage(e._oc, 0, 0);
+      woc._ctx.globalCompositeOperation = 'source-atop';
+      woc._ctx.fillStyle = '#ffffff';
+      woc._ctx.fillRect(0, 0, e.w, e.h);
+      woc._ctx.globalCompositeOperation = 'source-over';
+      ctx.drawImage(woc, -e.w / 2, -e.h / 2, e.w, e.h);
+    } else {
+      ctx.drawImage(e._oc, -e.w / 2, -e.h / 2, e.w, e.h);
+    }
 
     ctx.restore();
   }
@@ -769,60 +768,57 @@ function drawBigFish() {
       ctx.restore();
     }
 
-    // SNES-style pixel fish — exactly 28 wide × 15 tall
-    // facing right: tail=left (col 0), head=right (col 27)
-    const C = {
-      K: flash ? [255,255,255,255] : [0,0,0,255],           // outline/dark
-      D: flash ? [255,255,255,255] : isWindup||isRush ? [150,40,0,255]   : [15,80,130,255],  // dark body
-      M: flash ? [255,255,255,255] : isWindup||isRush ? [210,80,10,255]  : [40,140,190,255], // mid body
-      L: flash ? [255,255,255,255] : isWindup||isRush ? [240,130,40,255] : [80,190,230,255], // light body
-      B: flash ? [255,255,255,255] : isWindup||isRush ? [255,180,90,255] : [160,225,245,255],// belly
-      E: flash ? [255,255,255,255] : [255,255,255,255],      // eye white
-      P: flash ? [255,255,255,255] : [10,10,10,255],         // pupil
-    };
-    // 28×15 map — each string must be exactly 28 chars
-    const map = [
-      'KK..........KKK.............',  // row 0  tail top prong + dorsal base
-      '.KK.......KMMKK.............',  // row 1
-      '..KK.....KMMMMLKK...........',  // row 2  dorsal fin
-      'K..KK...KDDMMMLLKK..........',  // row 3
-      'KK..KKKKDDDMMMLLLLKK........',  // row 4
-      '.KK.KDDDDDMMMBBLLLKKK.......',  // row 5
-      '..KKDDDDDDMMMBBLLLLKEPKKK...',  // row 6  eye row
-      '..KKDDDDDDMMMBBLLLKKEPKLKK..',  // row 7  mouth row
-      '..KKDDDDDDMMMBBLLLLKKKKLKK..',  // row 8
-      '.KK.KDDDDDDMMMBBLLLKKKKK...',   // row 9  — 28 chars
-      'KK..KKKKDDDDMMMLLLLKK.......',  // row 10
-      'K..KK...KDDMMMLLLKK.........',  // row 11
-      '..KK.....KMMMLKKK...........',  // row 12 ventral fin
-      '.KK.......KMMKK.............',  // row 13
-      'KK..........KK..............',  // row 14 tail bottom prong
-    ];
-    const d = ctx.createImageData(W, H);
-    const px2 = d.data;
-    for (let row = 0; row < H; row++) {
-      const rowStr = map[row] || '';
-      for (let col = 0; col < W; col++) {
-        const ch = rowStr[col] || '.';
-        const color = C[ch] || null;
-        if (!color) continue;
-        const i = (row * W + col) * 4;
-        px2[i]=color[0]; px2[i+1]=color[1]; px2[i+2]=color[2]; px2[i+3]=color[3];
+    // SNES-style pixel fish — pre-rendered per state variant
+    const variant = flash ? 'flash' : (isWindup||isRush) ? 'hot' : 'normal';
+    const cacheKey = 'bigfish_' + variant;
+    if (!e['_oc_' + variant]) {
+      const palette = {
+        flash:  { K:[255,255,255,255], D:[255,255,255,255], M:[255,255,255,255], L:[255,255,255,255], B:[255,255,255,255], E:[255,255,255,255], P:[255,255,255,255] },
+        hot:    { K:[0,0,0,255], D:[150,40,0,255], M:[210,80,10,255], L:[240,130,40,255], B:[255,180,90,255], E:[255,255,255,255], P:[10,10,10,255] },
+        normal: { K:[0,0,0,255], D:[15,80,130,255], M:[40,140,190,255], L:[80,190,230,255], B:[160,225,245,255], E:[255,255,255,255], P:[10,10,10,255] },
+      };
+      const C = palette[variant];
+      const map = [
+        'KK..........KKK.............',
+        '.KK.......KMMKK.............',
+        '..KK.....KMMMMLKK...........',
+        'K..KK...KDDMMMLLKK..........',
+        'KK..KKKKDDDMMMLLLLKK........',
+        '.KK.KDDDDDMMMBBLLLKKK.......',
+        '..KKDDDDDDMMMBBLLLLKEPKKK...',
+        '..KKDDDDDDMMMBBLLLKKEPKLKK..',
+        '..KKDDDDDDMMMBBLLLLKKKKLKK..',
+        '.KK.KDDDDDDMMMBBLLLKKKKK...',
+        'KK..KKKKDDDDMMMLLLLKK.......',
+        'K..KK...KDDMMMLLLKK.........',
+        '..KK.....KMMMLKKK...........',
+        '.KK.......KMMKK.............',
+        'KK..........KK..............',
+      ];
+      const oc2 = getOC(cacheKey, W, H);
+      const d2 = oc2._ctx.createImageData(W, H);
+      const px2 = d2.data;
+      for (let row = 0; row < H; row++) {
+        const rowStr = map[row] || '';
+        for (let col = 0; col < W; col++) {
+          const color = C[rowStr[col]] || null;
+          if (!color) continue;
+          const i = (row * W + col) * 4;
+          px2[i]=color[0]; px2[i+1]=color[1]; px2[i+2]=color[2]; px2[i+3]=color[3];
+        }
       }
+      oc2._ctx.putImageData(d2, 0, 0);
+      e['_oc_' + variant] = oc2;
     }
-    // hitFlash tint overlay
-    const oc2 = getOC('bigfish_px', W, H);
-    const oc2d = oc2._ctx;
-    oc2d.putImageData(d, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    const drawOC = e['_oc_' + variant];
+    ctx.drawImage(drawOC, -W/2, -H/2, W, H);
     if (e.hitFlash > 0 && !flash) {
-      oc2d.globalCompositeOperation = 'source-atop';
-      oc2d.globalAlpha = e.hitFlash / HIT_FLASH_FRAMES * 0.8;
-      oc2d.fillStyle = '#ffffff';
-      oc2d.fillRect(0, 0, W, H);
-      oc2d.globalCompositeOperation = 'source-over';
-      oc2d.globalAlpha = 1;
+      ctx.globalAlpha = e.hitFlash / HIT_FLASH_FRAMES * 0.6;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-W/2, -H/2, W, H);
+      ctx.globalAlpha = 1;
     }
-    ctx.drawImage(oc2, -W/2, -H/2, W, H);
 
     ctx.restore();
 
