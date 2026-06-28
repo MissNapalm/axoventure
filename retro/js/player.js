@@ -407,6 +407,7 @@ function updatePlayer() {
     const oy = Math.min(py2, ey2) - Math.max(py1, ey1);
     if (ox > 0 && oy > 0) {
       player.dashing = false; player.dashTarget = null;
+      if (player.hurtTimer === 0) player.hurtTimer = 20; // brief post-dash invincibility
       const impactX = e.x + e.w / 2;
       const impactY = (e._y ? e._y : e.y) + e.h / 2;
       if (e.bigFish) {
@@ -450,6 +451,7 @@ function updatePlayer() {
       const ey2 = ey1 + e.h - inset * 2;
       if (Math.min(px2, ex2) - Math.max(px1, ex1) > 0 && Math.min(py2, ey2) - Math.max(py1, ey1) > 0) {
         player.groundDashing = false;
+        if (player.hurtTimer === 0) player.hurtTimer = 20; // brief post-dash invincibility
         if (e.bigFish) {
           const ex = e.x + e.w / 2, ey = e.y + e.h / 2;
           hitBigFishByDash(e, ex, ey);
