@@ -37,8 +37,8 @@ const npcs = [
           "Where did you find this?",
           "Did you go looking for this...for me?",
           "I don't know what to say...",
-          "I didn't know anyone even\nthought of me anymore",
-          "This means so much",
+          "I didn't know anyone even\nthought of me anymore.",
+          "This means so much.",
           "Thank you, Axo. You are\ncourageous and kind.",
           "I owe you.",
           "It may not mean much, but\ntake this golden key.\nI found it in the reeds.",
@@ -148,6 +148,25 @@ function drawNpcs() {
       ctx.drawImage(sprites[sprKey], sx, sy, npc.w, npc.h);
     }
     ctx.restore();
+
+    // Orange on Edwin's head when he says "This means so much."
+    if (npc.id === 'edwin' && dialog.active && dialog.npc === npc &&
+        hasOrange && !edwinGaveKey && dialog.page === 5) {
+      const ox = sx + Math.floor(npc.w / 2) - 5;
+      const oy = sy - 11;
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.fillStyle = '#ff8c00';
+      ctx.fillRect(ox + 1, oy + 1, 7, 7);
+      ctx.fillRect(ox,     oy + 2, 9, 5);
+      ctx.fillStyle = '#ffb347';
+      ctx.fillRect(ox + 2, oy + 2, 2, 2);
+      ctx.fillStyle = '#cc6600';
+      ctx.fillRect(ox + 6, oy + 4, 2, 3);
+      ctx.fillStyle = '#4a7c20';
+      ctx.fillRect(ox + 4, oy,     1, 2);
+      ctx.restore();
+    }
 
     const nearby = Math.abs(playerCx - (npc.x + npc.w / 2)) < TALK_DISTANCE;
     if (nearby && !dialog.active) {

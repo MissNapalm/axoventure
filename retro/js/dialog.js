@@ -68,7 +68,7 @@ function drawDialog() {
   const BOX_W = VIEW_W - 16;
   const BOX_X = 8;
   const BOX_Y = 68;
-  const TEXT_W = BOX_W - PAD * 2;
+  const TEXT_W = BOX_W - PAD * 2 - 12;
 
   const npc = dialog.npc;
   ctx.font = PIXEL_FONT;

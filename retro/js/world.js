@@ -15,7 +15,7 @@ const death = {
 };
 
 // Water zone: player swims freely inside this rectangle
-const WATER_ZONE = { x: 1700, y: 230, w: 2500, h: 600 };
+const WATER_ZONE = { x: 1700, y: 230, w: 2200, h: 600 };
 // The seafloor/rock shelf that closes the bottom
 const WATER_FLOOR_Y = WATER_ZONE.y + WATER_ZONE.h;
 
@@ -23,7 +23,7 @@ const WATER_FLOOR_Y = WATER_ZONE.y + WATER_ZONE.h;
 const LAND2_Y = 210;
 
 // Second water zone: deep pool Edgar sits next to — swimmable, orange guarded at the bottom
-const WATER_ZONE_2 = { x: 4480, y: 230, w: 300, h: 520 };
+const WATER_ZONE_2 = { x: 4480, y: 230, w: 500, h: 520 };
 const WATER_FLOOR_Y_2 = WATER_ZONE_2.y + WATER_ZONE_2.h;
 
 const platforms = [
