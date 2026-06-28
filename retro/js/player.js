@@ -29,6 +29,7 @@ const player = {
   sparks: [],
   impactFlash: 0,
   killSpin: 0,
+  killText: null, // { text, timer, x, y }
 };
 
 function resetLevel() {
@@ -43,6 +44,7 @@ function resetLevel() {
   player.sparks = [];
   player.impactFlash = 0;
   player.killSpin = 0;
+  player.killText = null;
   player.carrying = null;
   player.groundDashing = false; player.groundDashTimer = 0; player.airDashUsed = false; player.knockbackTimer = 0;
   cameraX = 0;
@@ -289,21 +291,28 @@ function updatePlayer() {
       const impactX = e.x + e.w / 2;
       const impactY = (e._y ? e._y : e.y) + e.h / 2;
       if (e.red) {
-        flipRedEnemy(e);
+        e.dead = true;
+        spawnDeathStars(e);
+        triggerLightning(Math.round(impactX - cameraX));
+        screenShakeTimer = 6;
+        player.killSpin = 10;
         player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -S.redBounceBack : S.redBounceBack;
-        player.knockbackTimer = 12;
+        player.vy = -4;
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         screenShakeTimer = SCREEN_SHAKE_FRAMES;
         spawnImpactVFX(impactX, impactY);
+        player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
       } else if (e.stunTimer > 0) {
         hurtPlayer();
       } else {
         player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
         player.vy = -4;
+        const wasAlive = !e.dead;
         hitEnemy(e);
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         screenShakeTimer = SCREEN_SHAKE_FRAMES;
         spawnImpactVFX(impactX, impactY);
+        if (e.dead && wasAlive) player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
       }
     }
   }
@@ -331,9 +340,15 @@ function updatePlayer() {
         } else {
           player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
           player.vy = -4;
+          const wasAlive = !e.dead;
           hitEnemy(e);
           hitFreezeTimer = HIT_FREEZE_FRAMES;
           screenShakeTimer = SCREEN_SHAKE_FRAMES;
+          if (e.dead && wasAlive) {
+            const ex = e.x + e.w / 2, ey = (e._y ? e._y : e.y) + e.h / 2;
+            spawnImpactVFX(ex, ey);
+            player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
+          }
         }
         break;
       }
@@ -572,5 +587,26 @@ function drawPlayer() {
       ctx.stroke();
     }
     ctx.restore();
+  }
+
+  // kill text floats up and fades
+  if (player.killText) {
+    const kt = player.killText;
+    kt.timer--;
+    if (kt.timer <= 0) {
+      player.killText = null;
+    } else {
+      const progress = 1 - kt.timer / 50;
+      const alpha = kt.timer / 50;
+      const floatY = Math.round(kt.y - cameraY - progress * 18);
+      ctx.save();
+      ctx.font = PIXEL_FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(kt.text, Math.round(kt.x - cameraX), floatY);
+      ctx.restore();
+    }
   }
 }
