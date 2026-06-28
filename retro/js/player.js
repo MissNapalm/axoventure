@@ -231,7 +231,7 @@ function updatePlayer() {
           player.groundDashAngle = Math.atan2(ny, nx);
           player.vx = nx * GROUND_DASH_SPEED;
           player.vy = ny * GROUND_DASH_SPEED;
-          player.facingLeft = nx < 0;
+          if (nx !== 0) player.facingLeft = nx < 0;
           if (!player.onGround && !player.inWater) player.airDashUsed = true;
           // flag that this dash started in water — spin triggers on water exit
           if (player.inWater) player.dashedFromWater = true;
