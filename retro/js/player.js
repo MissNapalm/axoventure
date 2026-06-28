@@ -83,7 +83,7 @@ function resetLevel() {
   // reset fish
   for (const e of fishEnemies) {
     e.x = e.startX; e.y = e.startY;
-    e.vx = 0.7; e.vy = 0;
+    e.vx = e.dart ? 2.2 : 0.7; e.vy = 0;
     e.hp = 1; e.dead = false;
     e.hitFlash = 0; e.deathFlash = 0; e.particles = [];
     e.bobPhase = Math.random() * Math.PI * 2;
@@ -332,7 +332,7 @@ function updatePlayer() {
   if (player.postDashTimer > 0) player.postDashTimer--;
   // slow passive regen — only when not recently hurt, not at max
   if (player.hurtTimer === 0 && player.hp < PLAYER_MAX_HP) {
-    player.hp = Math.min(PLAYER_MAX_HP, player.hp + 0.0008);
+    player.hp = Math.min(PLAYER_MAX_HP, player.hp + 0.003);
   }
 
   if (player.killSpin > 0) player.killSpin--;

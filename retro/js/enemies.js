@@ -374,6 +374,23 @@ function makeFish(x, y, swimLeft, swimRight) {
   };
 }
 
+function makeDartfish(x, y, swimLeft, swimRight) {
+  return {
+    fish: true, dart: true,
+    x, startX: x,
+    y, startY: y,
+    w: 20, h: 10,
+    vx: 2.2, vy: 0,
+    swimLeft, swimRight,
+    bobPhase: Math.random() * Math.PI * 2,
+    hp: 1,
+    dead: false,
+    hitFlash: 0,
+    deathFlash: 0,
+    particles: [],
+  };
+}
+
 const fishEnemies = [
   makeFish(1900, 380, 1800, 2000),
   makeFish(2050, 450, 1950, 2200),
@@ -395,6 +412,10 @@ const fishEnemies = [
   makeFish(3400, 550, 3250, 3600),
   makeFish(3700, 620, 3550, 3850),
   makeFish(3950, 580, 3800, 4100),
+  // dartfish guarding the orange at the bottom of the second pool
+  // pool x=4480–4780, floor y=750; they patrol the bottom third
+  makeDartfish(4510, 680, 4490, 4740),
+  makeDartfish(4700, 700, 4490, 4740),
 ];
 
 function updateFish() {
