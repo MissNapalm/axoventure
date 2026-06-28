@@ -45,22 +45,19 @@ function makeBolt(x) {
   }
 }
 
-function updateLightning() {
+function triggerLightning(screenX) {
   const now = performance.now();
-  if (now < lightning.boltEnd || now < lightning.flashEnd) return;
-  if (lightning.cooldown > 0) { lightning.cooldown--; return; }
-  lightning.nextIn--;
-  if (lightning.nextIn <= 0) {
-    const boltMs  = S.boltDur  * (1000 / 60);
-    const flashMs = S.flashDur * (1000 / 60);
-    const delayMs = S.flashDelay * (1000 / 60);
-    lightning.boltEnd    = now + boltMs;
-    lightning.flashStart = now + delayMs;
-    lightning.flashEnd   = now + delayMs + flashMs;
-    lightning.cooldown   = Math.floor(Math.random() * 20);
-    lightning.nextIn     = Math.random() * S.lightningFreq + S.lightningFreq * 0.5;
-    lightning.bolt       = makeBolt(Math.floor(Math.random() * (VIEW_W - 60) + 30));
-  }
+  const boltMs  = S.boltDur  * (1000 / 60);
+  const flashMs = S.flashDur * (1000 / 60);
+  const delayMs = S.flashDelay * (1000 / 60);
+  lightning.boltEnd    = now + boltMs;
+  lightning.flashStart = now + delayMs;
+  lightning.flashEnd   = now + delayMs + flashMs;
+  lightning.bolt       = makeBolt(screenX !== undefined ? screenX : Math.floor(Math.random() * (VIEW_W - 60) + 30));
+}
+
+function updateLightning() {
+  // lightning now only fires on kills via triggerLightning()
 }
 
 function drawLightning() {

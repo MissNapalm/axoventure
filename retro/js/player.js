@@ -100,14 +100,6 @@ function spawnImpactVFX(x, y) {
   // screen flash
   player.impactFlash = 6;
 
-  // 6 staggered rings — white burst then electric blue cascade
-  player.shockwaves.push({ x, y, r: 4,  life: 22, maxLife: 22, speed: 9,   color: '#ffffff',  lw: 3, delay: 0 });
-  player.shockwaves.push({ x, y, r: 4,  life: 20, maxLife: 20, speed: 6,   color: '#c0f0ff',  lw: 2, delay: 2 });
-  player.shockwaves.push({ x, y, r: 4,  life: 18, maxLife: 18, speed: 4.5, color: '#60d0ff',  lw: 2, delay: 4 });
-  player.shockwaves.push({ x, y, r: 4,  life: 16, maxLife: 16, speed: 3,   color: '#20a0ff',  lw: 1.5, delay: 7 });
-  player.shockwaves.push({ x, y, r: 4,  life: 14, maxLife: 14, speed: 7,   color: '#ffffff',  lw: 1, delay: 10 });
-  player.shockwaves.push({ x, y, r: 4,  life: 10, maxLife: 10, speed: 11,  color: '#ffffff',  lw: 1, delay: 12 });
-
   // 16 spark lines — two rings, inner fast short, outer slow long
   for (let i = 0; i < 16; i++) {
     const angle = (i / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;

@@ -155,6 +155,7 @@ function updateRedEnemies() {
         if (ox > 0 && oy > 0) {
           ne.dead = true; spawnDeathStars(ne);
           e.dead = true; spawnDeathStars(e);
+          triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           player.carrying = null;
           break;
         }
@@ -189,6 +190,7 @@ function updateRedEnemies() {
         if (ox > 0 && oy > 0) {
           ne.dead = true; spawnDeathStars(ne);
           e.dead  = true; spawnDeathStars(e);
+          triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           break;
         }
       }
@@ -349,6 +351,7 @@ function hitEnemy(e) {
   if (e.hp <= 0) {
     e.dead = true;
     spawnDeathStars(e);
+    triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
   } else {
     e.shakeTimer = 30;
   }
