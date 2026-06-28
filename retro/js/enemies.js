@@ -412,16 +412,15 @@ const fishEnemies = [
   makeFish(3400, 550, 3250, 3600),
   makeFish(3700, 620, 3550, 3850),
   makeFish(3950, 580, 3800, 4100),
-  // regular fish mid-pool (second pool x=4480–4980)
-  makeFish(4520, 400, 4490, 4960),
-  makeFish(4680, 350, 4490, 4960),
-  makeFish(4850, 430, 4490, 4960),
-  makeFish(4550, 550, 4490, 4960),
-  makeFish(4900, 500, 4490, 4960),
+  // regular fish mid-pool (second pool x=4480–4980, floor y=930)
+  makeFish(4520, 420, 4490, 4960),
+  makeFish(4700, 370, 4490, 4960),
+  makeFish(4860, 450, 4490, 4960),
+  makeFish(4560, 600, 4490, 4960),
+  makeFish(4880, 550, 4490, 4960),
   // dartfish guarding the orange at the bottom of the second pool
-  // pool x=4480–4980, floor y=750; they patrol the bottom third
-  makeDartfish(4520, 680, 4490, 4960),
-  makeDartfish(4800, 700, 4490, 4960),
+  makeDartfish(4530, 850, 4490, 4960),
+  makeDartfish(4820, 870, 4490, 4960),
 ];
 
 function updateFish() {
@@ -436,7 +435,7 @@ function updateFish() {
       // respawn when player moves away
       if (Math.abs(e.startX - (player.x + player.w / 2)) > VIEW_W) {
         e.x = e.startX; e.y = e.startY;
-        e.vx = 0.7; e.vy = 0;
+        e.vx = e.dart ? 2.2 : 0.7; e.vy = 0;
         e.hp = 1; e.dead = false;
         e.hitFlash = 0; e.deathFlash = 0; e.particles = [];
       }

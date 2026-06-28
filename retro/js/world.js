@@ -23,7 +23,7 @@ const WATER_FLOOR_Y = WATER_ZONE.y + WATER_ZONE.h;
 const LAND2_Y = 210;
 
 // Second water zone: deep pool Edgar sits next to — swimmable, orange guarded at the bottom
-const WATER_ZONE_2 = { x: 4480, y: 230, w: 500, h: 520 };
+const WATER_ZONE_2 = { x: 4480, y: 230, w: 500, h: 700 };
 const WATER_FLOOR_Y_2 = WATER_ZONE_2.y + WATER_ZONE_2.h;
 
 const platforms = [
@@ -68,9 +68,10 @@ const platforms = [
   // Right wall of the pool
   { x: WATER_ZONE_2.x + WATER_ZONE_2.w, y: WATER_ZONE_2.y, w: 20, h: WATER_ZONE_2.h + 80, color: '#1a1a2e' },
   // Ledges inside pool so player can climb out in stages
-  { x: WATER_ZONE_2.x + 10,                  y: WATER_ZONE_2.y + 320, w: 70, h: 8, color: '#1e2a3a', oneWay: true },
-  { x: WATER_ZONE_2.x + WATER_ZONE_2.w - 80, y: WATER_ZONE_2.y + 200, w: 70, h: 8, color: '#1e2a3a', oneWay: true },
-  { x: WATER_ZONE_2.x + 20,                  y: WATER_ZONE_2.y + 110, w: 60, h: 8, color: '#1e2a3a', oneWay: true },
+  { x: WATER_ZONE_2.x + 10,                  y: WATER_ZONE_2.y + 540, w: 70, h: 8, color: '#1e2a3a', oneWay: true },
+  { x: WATER_ZONE_2.x + WATER_ZONE_2.w - 80, y: WATER_ZONE_2.y + 380, w: 70, h: 8, color: '#1e2a3a', oneWay: true },
+  { x: WATER_ZONE_2.x + 20,                  y: WATER_ZONE_2.y + 230, w: 60, h: 8, color: '#1e2a3a', oneWay: true },
+  { x: WATER_ZONE_2.x + WATER_ZONE_2.w - 80, y: WATER_ZONE_2.y + 110, w: 70, h: 8, color: '#1e2a3a', oneWay: true },
 ];
 
 const WORLD_W = 6100;

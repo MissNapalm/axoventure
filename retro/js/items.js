@@ -2,7 +2,7 @@
 
 const orange = {
   x: WATER_ZONE_2.x + WATER_ZONE_2.w / 2 - 6,
-  y: WATER_FLOOR_Y_2 - 22,
+  y: WATER_FLOOR_Y_2 - 20,
   w: 12, h: 12,
   collected: false,
   bobPhase: 0,
