@@ -371,21 +371,28 @@ function drawPlayer() {
   const px     = Math.round(player.x - cameraX);
   const bottom = Math.round(player.y + player.h - cameraY);
 
-  // draw trail — thick+bright at head (newest), thin+faded at tail (oldest)
+  // draw trail — smooth tapered ribbon from tail (thin/faint) to head (thick/bright)
   if (player.trail.length > 1) {
     const n = player.trail.length;
+    // draw in passes: each pass is one segment, but use quadratic curves through midpoints
+    // so adjacent segments blend seamlessly
     for (let i = 1; i < n; i++) {
+      const t = i / (n - 1); // 0=tail, 1=head
       const a = player.trail[i - 1];
       const b = player.trail[i];
-      const t = i / (n - 1); // 0=oldest end, 1=newest end
+      const mx = (a.x + b.x) / 2 - cameraX;
+      const my = (a.y + b.y) / 2 - cameraY;
+      const prevMx = i > 1 ? (player.trail[i - 2].x + a.x) / 2 - cameraX : a.x - cameraX;
+      const prevMy = i > 1 ? (player.trail[i - 2].y + a.y) / 2 - cameraY : a.y - cameraY;
       ctx.save();
-      ctx.globalAlpha = t * 0.85;
+      ctx.globalAlpha = t * t * 0.9;
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = t * 18;
+      ctx.lineWidth = t * 16;
+      ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(a.x - cameraX, a.y - cameraY);
-      ctx.lineTo(b.x - cameraX, b.y - cameraY);
+      ctx.moveTo(prevMx, prevMy);
+      ctx.quadraticCurveTo(a.x - cameraX, a.y - cameraY, mx, my);
       ctx.stroke();
       ctx.restore();
     }
