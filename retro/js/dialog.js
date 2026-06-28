@@ -65,10 +65,7 @@ function drawDialog() {
   const nameH = 8;
   const dividerGap = 6;
   const textGap = 9;
-  const BOX_W = VIEW_W - 16;
-  const BOX_X = 8;
-  const BOX_Y = 68;
-  const TEXT_W = BOX_W - PAD * 2 - 12;
+  const MAX_TEXT_W = VIEW_W - 16 - PAD * 2 - 12;
 
   const npc = dialog.npc;
   ctx.font = PIXEL_FONT;
@@ -78,9 +75,16 @@ function drawDialog() {
   const rawLines = npc.lines[dialog.page].split('\n');
   const wrappedLines = [];
   for (const raw of rawLines) {
-    for (const wl of wrapText(raw, TEXT_W)) wrappedLines.push(wl);
+    for (const wl of wrapText(raw, MAX_TEXT_W)) wrappedLines.push(wl);
   }
 
+  // Size box to fit actual content
+  const nameW = ctx.measureText(npc.name).width;
+  const maxLineW = wrappedLines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
+  const contentW = Math.max(nameW, maxLineW);
+  const BOX_W = Math.ceil(contentW) + PAD * 2 + 8;
+  const BOX_X = 8;
+  const BOX_Y = 68;
   const BOX_H = PAD + nameH + dividerGap + wrappedLines.length * lineH + PAD;
 
   ctx.fillStyle = 'rgba(8,3,24,0.92)';
