@@ -407,11 +407,11 @@ function updatePlayer() {
     const oy = Math.min(py2, ey2) - Math.max(py1, ey1);
     if (ox > 0 && oy > 0) {
       player.dashing = false; player.dashTarget = null;
-      if (player.hurtTimer === 0) player.hurtTimer = 20; // brief post-dash invincibility
       const impactX = e.x + e.w / 2;
       const impactY = (e._y ? e._y : e.y) + e.h / 2;
       if (e.bigFish) {
         hitBigFishByHoming(e, impactX, impactY);
+        if (!e.dead && player.hurtTimer === 0) player.hurtTimer = 20;
       } else if (e.fish) {
         hitFishByHoming(e, impactX, impactY);
       } else if (e.red) {
@@ -434,7 +434,10 @@ function updatePlayer() {
         screenShakeTimer = SCREEN_SHAKE_FRAMES;
         spawnImpactVFX(impactX, impactY);
         if (e.dead) player.killText = { text: wasLastDash ? 'ONE-TWO HIT!' : 'HOMING HIT!', timer: 60, x: impactX, y: impactY - 12 };
-        else player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
+        else {
+          player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
+          if (player.hurtTimer === 0) player.hurtTimer = 20;
+        }
       }
     }
   }
@@ -451,10 +454,10 @@ function updatePlayer() {
       const ey2 = ey1 + e.h - inset * 2;
       if (Math.min(px2, ex2) - Math.max(px1, ex1) > 0 && Math.min(py2, ey2) - Math.max(py1, ey1) > 0) {
         player.groundDashing = false;
-        if (player.hurtTimer === 0) player.hurtTimer = 20; // brief post-dash invincibility
         if (e.bigFish) {
           const ex = e.x + e.w / 2, ey = e.y + e.h / 2;
           hitBigFishByDash(e, ex, ey);
+          if (!e.dead && player.hurtTimer === 0) player.hurtTimer = 20;
         } else if (e.fish) {
           const ex = e.x + e.w / 2, ey = e.y + e.h / 2;
           hitFishByDash(e, ex, ey);
@@ -462,8 +465,8 @@ function updatePlayer() {
           flipRedEnemy(e);
           player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -S.redBounceBack : S.redBounceBack;
           player.knockbackTimer = 12;
-        hitFreezeTimer = HIT_FREEZE_FRAMES;
-        screenShakeTimer = SCREEN_SHAKE_FRAMES;
+          hitFreezeTimer = HIT_FREEZE_FRAMES;
+          screenShakeTimer = SCREEN_SHAKE_FRAMES;
         } else {
           player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
           player.vy = -4;
@@ -473,7 +476,10 @@ function updatePlayer() {
           hitFreezeTimer = HIT_FREEZE_FRAMES;
           screenShakeTimer = SCREEN_SHAKE_FRAMES;
           spawnImpactVFX(ex, ey);
-          if (!e.dead) player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
+          if (!e.dead) {
+            player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
+            if (player.hurtTimer === 0) player.hurtTimer = 20;
+          }
         }
         break;
       }
