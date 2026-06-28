@@ -91,6 +91,11 @@ function drawLightning() {
       drawPixelLine(b.x1 + 1, b.y1, b.x2 + 1, b.y2, '#aad4ff');
     }
     ctx.globalAlpha = 1;
+
+    // dim blue-white flash — not pure white, safe brightness
+    const flashAlpha = alpha * alpha * 0.3;
+    ctx.fillStyle = `rgba(180,220,255,${flashAlpha})`;
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   }
 
 }
