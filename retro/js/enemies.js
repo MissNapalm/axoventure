@@ -377,6 +377,8 @@ function hitEnemy(e) {
     e.dead = true;
     spawnDeathStars(e);
     triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
+    screenShakeTimer = 6;
+    if (player.dashing || player.groundDashing) player.killSpin = 10;
   } else {
     e.shakeTimer = 30;
   }

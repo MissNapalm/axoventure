@@ -27,6 +27,7 @@ const player = {
   shockwaves: [],
   sparks: [],
   impactFlash: 0,
+  killSpin: 0,
 };
 
 function resetLevel() {
@@ -40,6 +41,7 @@ function resetLevel() {
   player.shockwaves = [];
   player.sparks = [];
   player.impactFlash = 0;
+  player.killSpin = 0;
   player.carrying = null;
   player.groundDashing = false; player.groundDashTimer = 0; player.airDashUsed = false; player.knockbackTimer = 0;
   cameraX = 0;
@@ -203,6 +205,8 @@ function updatePlayer() {
   if (jumpPressed && player.onGround) { player.vy = -S.jumpForce; player.onGround = false; }
 
   if (player.hurtTimer > 0) player.hurtTimer--;
+
+  if (player.killSpin > 0) player.killSpin--;
 
   // Ground dash countdown
   if (player.groundDashing) {
@@ -430,7 +434,14 @@ function drawPlayer() {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
 
-  if (player.dashing && player.dashTarget) {
+  if (player.killSpin > 0) {
+    const pcx = player.x + player.w / 2 - cameraX;
+    const pcy = player.y + player.h / 2 - cameraY;
+    const t = 1 - player.killSpin / 10;
+    ctx.translate(pcx, pcy);
+    ctx.rotate(t * Math.PI * 2);
+    ctx.drawImage(drawSpr, -sw / 2, -sh / 2, sw, sh);
+  } else if (player.dashing && player.dashTarget) {
     const pcx = player.x + player.w / 2 - cameraX;
     const pcy = player.y + player.h / 2 - cameraY;
     const snapped = player.dashAngle || 0;
