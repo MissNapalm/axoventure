@@ -235,6 +235,7 @@ function updatePlayer() {
 
   if (dialog.active) {
     tickDialog();
+    tickNpcs();
     player.vx = 0;
     player.moving = false;
     if (!player.onGround) { player.vy += S.gravity; player.y += player.vy; resolveCollisions(); }

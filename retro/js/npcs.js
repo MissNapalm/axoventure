@@ -2,6 +2,12 @@
 let hasOrange = false;
 let edwinGaveKey = false;
 
+// Crying animation for Edwin
+const CRY_FRAMES = ['cap2','cap3','cap4','cap5','cap6','cap7','cap8','cap10'];
+let cryFrame = 0;
+let cryTimer = 0;
+const CRY_INTERVAL = 6; // frames per animation step
+
 const npcs = [
   {
     name: 'Edgar',
@@ -77,6 +83,17 @@ const poolFish = Array.from({ length: 5 }, (_, i) => ({
   dir: i % 2 === 0 ? 1 : -1,
 }));
 
+function tickNpcs() {
+  const edwinCrying = hasOrange && !edwinGaveKey &&
+    dialog.active && dialog.npc && dialog.npc.id === 'edwin' && dialog.page >= 5;
+  if (edwinCrying) {
+    cryTimer++;
+    if (cryTimer >= CRY_INTERVAL) { cryTimer = 0; cryFrame = (cryFrame + 1) % CRY_FRAMES.length; }
+  } else {
+    cryFrame = 0; cryTimer = 0;
+  }
+}
+
 function nearNpc() {
   const playerCx = player.x + player.w / 2;
   return npcs.find(n => Math.abs(playerCx - (n.x + n.w / 2)) < TALK_DISTANCE) || null;
@@ -134,7 +151,9 @@ function drawNpcs() {
 
   const playerCx = player.x + player.w / 2;
   for (const npc of npcs) {
-    const sprKey = npc.sprite;
+    const edwinCrying = npc.id === 'edwin' && hasOrange && !edwinGaveKey &&
+      dialog.active && dialog.npc === npc && dialog.page >= 5;
+    const sprKey = edwinCrying ? CRY_FRAMES[cryFrame] : npc.sprite;
     if (!sprites[sprKey] || !sprites[sprKey].naturalWidth) continue;
     const sx = Math.round(npc.x - cameraX);
     const sy = Math.round(npc.y - cameraY);
