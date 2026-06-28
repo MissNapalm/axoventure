@@ -408,7 +408,9 @@ function drawPlayer() {
       player.facingLeft = player.dashTarget.x + player.dashTarget.w / 2 < player.x + player.w / 2;
     }
   } else if (player.groundDashing) {
-    sprite = sprites['jump'];
+    sprite = Math.abs(Math.sin(player.groundDashAngle)) > 0.3
+      ? sprites['jump']
+      : sprites[WALK_SEQ[player.frame]];
   } else if (!player.onGround) {
     sprite = sprites['jump'];
   } else if (player.moving) {
