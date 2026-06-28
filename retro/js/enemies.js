@@ -382,10 +382,19 @@ const fishEnemies = [
   makeFish(2600, 390, 2480, 2720),
   makeFish(2780, 460, 2650, 2900),
   makeFish(2950, 350, 2820, 3080),
+  makeFish(3150, 420, 3020, 3300),
+  makeFish(3350, 370, 3200, 3520),
+  makeFish(3550, 480, 3400, 3700),
+  makeFish(3750, 360, 3600, 3900),
+  makeFish(3950, 440, 3800, 4100),
   makeFish(1850, 560, 1750, 2050),
   makeFish(2150, 620, 2000, 2350),
   makeFish(2500, 580, 2380, 2650),
   makeFish(2750, 640, 2600, 2900),
+  makeFish(3100, 600, 2950, 3250),
+  makeFish(3400, 550, 3250, 3600),
+  makeFish(3700, 620, 3550, 3850),
+  makeFish(3950, 580, 3800, 4100),
 ];
 
 function updateFish() {
@@ -416,8 +425,8 @@ function updateFish() {
     if (e.x <= e.swimLeft)             { e.x = e.swimLeft;         e.vx =  Math.abs(e.vx); }
     if (e.x + e.w >= e.swimRight)      { e.x = e.swimRight - e.w;  e.vx = -Math.abs(e.vx); }
 
-    // hurt player on contact unless dashing/homing
-    if (!player.dashing && !player.groundDashing && player.hurtTimer === 0) {
+    // hurt player on contact unless dashing/homing/dead
+    if (!e.dead && !player.dashing && !player.groundDashing && player.hurtTimer === 0 && player.postDashTimer === 0) {
       const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
       const oy = Math.min(player.y + player.h, e.y + e.h) - Math.max(player.y, e.y);
       if (ox > 0 && oy > 0) hurtPlayer();
