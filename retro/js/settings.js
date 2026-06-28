@@ -9,15 +9,15 @@ const settings = {
   flashDur:     { value: 1,     min: 0,    max: 60,   step: 1,    label: 'Flash Duration' },
   flashDelay:   { value: 0,     min: 0,    max: 60,   step: 1,    label: 'Bolt→Flash Delay' },
   lightningFreq:{ value: 350,   min: 100,  max: 1200, step: 50,   label: 'Lightning Freq' },
-  carryOffset:  { value: -4,    min: -30,  max: 20,   step: 1,    label: 'Carry Y Offset' },
-  carryOffsetL: { value: 0,     min: -40,  max: 40,   step: 1,    label: 'Carry X Left' },
-  carryOffsetR: { value: 0,     min: -40,  max: 40,   step: 1,    label: 'Carry X Right' },
-  carryJumpY:   { value: 0,     min: -40,  max: 40,   step: 1,    label: 'Carry Jump Y' },
-  flippedGndY:  { value: 0,     min: -20,  max: 20,   step: 1,    label: 'Flip Ground Y' },
+  carryOffset:  { value: 7,     min: -30,  max: 20,   step: 1,    label: 'Carry Y Offset' },
+  carryOffsetL: { value: -6,    min: -40,  max: 40,   step: 1,    label: 'Carry X Left' },
+  carryOffsetR: { value: 5,     min: -40,  max: 40,   step: 1,    label: 'Carry X Right' },
+  carryJumpY:   { value: -12,   min: -40,  max: 40,   step: 1,    label: 'Carry Jump Y' },
+  flippedGndY:  { value: 4,     min: -20,  max: 20,   step: 1,    label: 'Flip Ground Y' },
   dashYOffset:  { value: 0,     min: -30,  max: 30,   step: 1,    label: 'Dash Y Offset' },
-  throwStrength:{ value: 11,    min: 1,    max: 20,   step: 0.5,  label: 'Throw Strength' },
+  throwStrength:{ value: 2.5,   min: 1,    max: 20,   step: 0.5,  label: 'Throw Strength' },
   redBounceBack:{ value: 4,     min: 0,    max: 20,   step: 0.5,  label: 'Axo Knockback' },
-  redFlipGrav:  { value: 0.35,  min: 0.01, max: 2.0,  step: 0.01, label: 'Red Flip Grav' },
+  redFlipGrav:  { value: 0.49,  min: 0.01, max: 2.0,  step: 0.01, label: 'Red Flip Grav' },
 };
 
 // S.gravity instead of settings.gravity.value

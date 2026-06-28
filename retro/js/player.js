@@ -1,4 +1,4 @@
-const PLAYER_START = { x: 60, y: 170 };
+const PLAYER_START = { x: -100, y: 170 };
 
 const player = {
   x: PLAYER_START.x, y: PLAYER_START.y,
@@ -20,6 +20,7 @@ const player = {
   carrying: null,
   groundDashing: false,
   groundDashTimer: 0,
+  airDashUsed: false,
   knockbackTimer: 0,
 };
 
@@ -31,7 +32,7 @@ function resetLevel() {
   player.hurtTimer = 0;
   player.dashing = false; player.dashTarget = null;
   player.carrying = null;
-  player.groundDashing = false; player.groundDashTimer = 0; player.knockbackTimer = 0;
+  player.groundDashing = false; player.groundDashTimer = 0; player.airDashUsed = false; player.knockbackTimer = 0;
   cameraX = 0;
   // reset enemies
   for (const e of enemies) {
@@ -95,11 +96,14 @@ function updatePlayer() {
       const nearby = nearNpc();
       if (nearby) {
         openDialog(nearby);
-      } else if (player.onGround && !player.groundDashing) {
-        player.groundDashing = true;
-        player.groundDashTimer = GROUND_DASH_FRAMES;
-        player.vx = player.facingLeft ? -GROUND_DASH_SPEED : GROUND_DASH_SPEED;
-        player.vy = 0;
+      } else if (!player.groundDashing) {
+        if (player.onGround || (!player.airDashUsed && !player.dashing)) {
+          player.groundDashing = true;
+          player.groundDashTimer = GROUND_DASH_FRAMES;
+          player.vx = player.facingLeft ? -GROUND_DASH_SPEED : GROUND_DASH_SPEED;
+          player.vy = 0;
+          if (!player.onGround) player.airDashUsed = true;
+        }
       }
     }
   }
@@ -149,7 +153,7 @@ function updatePlayer() {
     let best = null, bestDist = HOMING_RANGE;
     for (const e of [...enemies, ...redEnemies]) {
       if (e.dead || e.flipped || e.carried) continue;
-      const ey = e._y !== undefined ? e._y + e.h / 2 : e.y + e.h / 2;
+      const ey = (e._y ? e._y : e.y) + e.h / 2;
       const dist = Math.hypot((e.x + e.w / 2) - pcx, ey - pcy);
       if (dist < bestDist) { bestDist = dist; best = e; }
     }
@@ -189,7 +193,7 @@ function updatePlayer() {
     const px1 = player.x + inset, px2 = player.x + player.w - inset;
     const py1 = player.y + inset, py2 = player.y + player.h - inset;
     const ex1 = e.x + inset,      ex2 = e.x + e.w - inset;
-    const ey1 = (e._y !== undefined ? e._y : e.y) + inset;
+    const ey1 = (e._y ? e._y : e.y) + inset;
     const ey2 = ey1 + e.h - inset * 2;
     const ox = Math.min(px2, ex2) - Math.max(px1, ex1);
     const oy = Math.min(py2, ey2) - Math.max(py1, ey1);
@@ -217,7 +221,7 @@ function updatePlayer() {
     for (const e of [...enemies, ...redEnemies]) {
       if (e.dead || e.flipped || e.carried) continue;
       const ex1 = e.x + inset, ex2 = e.x + e.w - inset;
-      const ey1 = (e._y !== undefined ? e._y : e.y) + inset;
+      const ey1 = (e._y ? e._y : e.y) + inset;
       const ey2 = ey1 + e.h - inset * 2;
       if (Math.min(px2, ex2) - Math.max(px1, ex1) > 0 && Math.min(py2, ey2) - Math.max(py1, ey1) > 0) {
         player.groundDashing = false;
@@ -251,7 +255,7 @@ function updatePlayer() {
   const wasOnGround = player.onGround;
   resolveCollisions();
   player.wasOnGround = wasOnGround;
-  if (player.onGround) { player.dashing = false; player.dashTarget = null; player.homingUsed = false; }
+  if (player.onGround) { player.dashing = false; player.dashTarget = null; player.homingUsed = false; player.airDashUsed = false; }
 
   cameraX += ((player.x - VIEW_W / 2 + player.w / 2) - cameraX) * 0.12;
 
@@ -307,7 +311,8 @@ function drawPlayer() {
 
   const sw = sprite.naturalWidth;
   const sh = sprite.naturalHeight;
-  const yOffset = (!player.onGround ? S.jumpYOffset : 0) + (player.groundDashing ? S.dashYOffset : 0);
+  const dashJitter = player.groundDashing ? (Math.random() < 0.15 ? 1 : 0) : 0;
+  const yOffset = (!player.onGround ? S.jumpYOffset : 0) + (player.groundDashing ? S.dashYOffset : 0) + dashJitter;
   const py = bottom - sh + yOffset;
 
   // flicker during invincibility

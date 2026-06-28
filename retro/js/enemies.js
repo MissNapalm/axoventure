@@ -385,6 +385,13 @@ function updateEnemies() {
 
     e.frameTimer++;
     if (e.frameTimer >= 10) { e.frameTimer = 0; e.frame = (e.frame + 1) % 2; }
+
+    // hurt player on contact unless dashing or homing
+    if (!player.dashing && !player.groundDashing && player.hurtTimer === 0) {
+      const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
+      const oy = Math.min(player.y + player.h, e.y + e.h) - Math.max(player.y, e.y);
+      if (ox > 0 && oy > 0) hurtPlayer();
+    }
   }
 }
 
