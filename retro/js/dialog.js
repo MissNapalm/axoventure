@@ -65,27 +65,23 @@ function drawDialog() {
   const nameH = 8;
   const dividerGap = 6;
   const textGap = 9;
-  const MAX_BOX_W = VIEW_W - 20; // never wider than screen minus margins
-  const MAX_TEXT_W = MAX_BOX_W - PAD * 2;
+  const BOX_W = VIEW_W - 16;
+  const BOX_X = 8;
+  const BOX_Y = 68;
+  const TEXT_W = BOX_W - PAD * 2;
 
   const npc = dialog.npc;
   ctx.font = PIXEL_FONT;
   ctx.textBaseline = 'top';
 
-  // Wrap each \n-split segment independently, collect all wrapped lines
+  // Wrap each \n-split segment independently
   const rawLines = npc.lines[dialog.page].split('\n');
   const wrappedLines = [];
   for (const raw of rawLines) {
-    for (const wl of wrapText(raw, MAX_TEXT_W)) wrappedLines.push(wl);
+    for (const wl of wrapText(raw, TEXT_W)) wrappedLines.push(wl);
   }
 
-  const BOX_W = Math.min(MAX_BOX_W, Math.max(
-    ctx.measureText(npc.name).width,
-    ...wrappedLines.map(l => ctx.measureText(l).width)
-  ) + PAD * 2);
   const BOX_H = PAD + nameH + dividerGap + wrappedLines.length * lineH + PAD;
-  const BOX_X = Math.round((VIEW_W - BOX_W) / 2);
-  const BOX_Y = 68;
 
   ctx.fillStyle = 'rgba(8,3,24,0.92)';
   ctx.fillRect(BOX_X, BOX_Y, BOX_W, BOX_H);
