@@ -9,7 +9,7 @@ let cryTimer = 0;
 let cryDone = false;
 let cryLoops = 0;
 const CRY_LOOPS = 3;
-const CRY_INTERVAL = 18;
+const CRY_INTERVAL = 12;
 
 const npcs = [
   {
