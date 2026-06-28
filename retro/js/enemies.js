@@ -442,9 +442,10 @@ function updateFish() {
       continue;
     }
 
-    // sine-wave bob
+    // sine-wave bob — clamp so fish never breach the water surface
     e.bobPhase += 0.05;
-    e.y = e.startY + Math.sin(e.bobPhase) * 8;
+    const waterSurface = (e.startX >= WATER_ZONE_2.x ? WATER_ZONE_2.y : WATER_ZONE.y) + e.h + 2;
+    e.y = Math.max(waterSurface, e.startY + Math.sin(e.bobPhase) * 8);
 
     // horizontal patrol
     e.x += e.vx;
