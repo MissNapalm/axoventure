@@ -6,7 +6,8 @@ let edwinGaveKey = false;
 const CRY_FRAMES = ['cap2','cap3','cap4','cap5','cap6','cap7','cap8','cap10'];
 let cryFrame = 0;
 let cryTimer = 0;
-const CRY_INTERVAL = 6; // frames per animation step
+let cryDone = false;
+const CRY_INTERVAL = 18; // frames per animation step (slow)
 
 const npcs = [
   {
@@ -87,10 +88,16 @@ function tickNpcs() {
   const edwinCrying = hasOrange && !edwinGaveKey &&
     dialog.active && dialog.npc && dialog.npc.id === 'edwin' && dialog.page >= 5;
   if (edwinCrying) {
-    cryTimer++;
-    if (cryTimer >= CRY_INTERVAL) { cryTimer = 0; cryFrame = (cryFrame + 1) % CRY_FRAMES.length; }
+    if (!cryDone) {
+      cryTimer++;
+      if (cryTimer >= CRY_INTERVAL) {
+        cryTimer = 0;
+        cryFrame++;
+        if (cryFrame >= CRY_FRAMES.length - 1) { cryFrame = CRY_FRAMES.length - 1; cryDone = true; }
+      }
+    }
   } else {
-    cryFrame = 0; cryTimer = 0;
+    cryFrame = 0; cryTimer = 0; cryDone = false;
   }
 }
 
@@ -167,25 +174,6 @@ function drawNpcs() {
       ctx.drawImage(sprites[sprKey], sx, sy, npc.w, npc.h);
     }
     ctx.restore();
-
-    // Orange on Edwin's head when he says "This means so much."
-    if (npc.id === 'edwin' && dialog.active && dialog.npc === npc &&
-        hasOrange && !edwinGaveKey && dialog.page === 5) {
-      const ox = sx + Math.floor(npc.w / 2) - 5;
-      const oy = sy - 11;
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      ctx.fillStyle = '#ff8c00';
-      ctx.fillRect(ox + 1, oy + 1, 7, 7);
-      ctx.fillRect(ox,     oy + 2, 9, 5);
-      ctx.fillStyle = '#ffb347';
-      ctx.fillRect(ox + 2, oy + 2, 2, 2);
-      ctx.fillStyle = '#cc6600';
-      ctx.fillRect(ox + 6, oy + 4, 2, 3);
-      ctx.fillStyle = '#4a7c20';
-      ctx.fillRect(ox + 4, oy,     1, 2);
-      ctx.restore();
-    }
 
     const nearby = Math.abs(playerCx - (npc.x + npc.w / 2)) < TALK_DISTANCE;
     if (nearby && !dialog.active) {
