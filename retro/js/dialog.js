@@ -5,7 +5,7 @@ const dialog = {
   chars: 0,
   charTimer: 0,
   CHAR_INTERVAL: 2,
-  get fullText() { return this.npc ? this.npc.lines[this.page] : ''; },
+  get fullText() { return this.npc ? this.npc.lines[this.page].replace(/\n/g, ' ') : ''; },
   get done()     { return this.chars >= this.fullText.length; },
 };
 
@@ -39,6 +39,24 @@ function tickDialog() {
   }
 }
 
+// Word-wrap a single string to fit within maxPx pixels, returns array of lines
+function wrapText(text, maxPx) {
+  const words = text.split(' ');
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const test = current ? current + ' ' + word : word;
+    if (ctx.measureText(test).width <= maxPx) {
+      current = test;
+    } else {
+      if (current) lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [''];
+}
+
 function drawDialog() {
   if (!dialog.active) return;
 
@@ -47,18 +65,25 @@ function drawDialog() {
   const nameH = 8;
   const dividerGap = 6;
   const textGap = 9;
+  const MAX_BOX_W = VIEW_W - 20; // never wider than screen minus margins
+  const MAX_TEXT_W = MAX_BOX_W - PAD * 2;
 
   const npc = dialog.npc;
   ctx.font = PIXEL_FONT;
   ctx.textBaseline = 'top';
-  const fullLines = npc.lines[dialog.page].split('\n');
 
-  const maxLineW = Math.max(
+  // Wrap each \n-split segment independently, collect all wrapped lines
+  const rawLines = npc.lines[dialog.page].split('\n');
+  const wrappedLines = [];
+  for (const raw of rawLines) {
+    for (const wl of wrapText(raw, MAX_TEXT_W)) wrappedLines.push(wl);
+  }
+
+  const BOX_W = Math.min(MAX_BOX_W, Math.max(
     ctx.measureText(npc.name).width,
-    ...fullLines.map(l => ctx.measureText(l).width)
-  );
-  const BOX_W = Math.ceil(maxLineW) + PAD * 2;
-  const BOX_H = PAD + nameH + dividerGap + fullLines.length * lineH + PAD;
+    ...wrappedLines.map(l => ctx.measureText(l).width)
+  ) + PAD * 2);
+  const BOX_H = PAD + nameH + dividerGap + wrappedLines.length * lineH + PAD;
   const BOX_X = Math.round((VIEW_W - BOX_W) / 2);
   const BOX_Y = 68;
 
@@ -80,7 +105,7 @@ function drawDialog() {
   ctx.fillStyle = '#f0e6ff';
   const textStartY = dividerY + textGap;
   let charsLeft = dialog.chars;
-  fullLines.forEach((line, i) => {
+  wrappedLines.forEach((line, i) => {
     const visible = line.slice(0, charsLeft);
     if (visible.length > 0) ctx.fillText(visible, BOX_X + PAD, textStartY + i * lineH);
     charsLeft = Math.max(0, charsLeft - line.length);

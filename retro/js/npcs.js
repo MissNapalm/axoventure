@@ -59,7 +59,6 @@ const npcs = [
     flipX: false,
     get y() { return LAND2_Y - this.h; },
     lines: [
-      "Hello again",
       "I'm sorry about Edwin.\nHe's lost so much.",
       "He lost his whole family in\nthe freeze last winter, and I\nthink he's just starting to\nrealize they aren't coming back",
       "He even lost his orange...",
