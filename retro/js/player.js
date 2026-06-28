@@ -453,7 +453,7 @@ function updatePlayer() {
   }
 
   // Ground dash hit detection — same effect as homing hit
-  if (player.groundDashing && player.hurtTimer === 0) {
+  if (player.groundDashing) {
     const inset = 6;
     const px1 = player.x + inset, px2 = player.x + player.w - inset;
     const py1 = player.y + inset, py2 = player.y + player.h - inset;
