@@ -97,19 +97,24 @@ const raindrops = Array.from({ length: 60 }, () => ({
   speed: Math.floor(Math.random() * 2) + 2,
 }));
 
+// Pre-rendered water fill (gradient is vertical, position-independent)
+const _waterOC = getOC('water_fill', WATER_ZONE.w, WATER_ZONE.h);
+(function() {
+  const g = _waterOC._ctx.createLinearGradient(0, 0, 0, WATER_ZONE.h);
+  g.addColorStop(0,   'rgba(20,80,140,0.82)');
+  g.addColorStop(0.5, 'rgba(8,40,90,0.90)');
+  g.addColorStop(1,   'rgba(4,18,50,0.97)');
+  _waterOC._ctx.fillStyle = g;
+  _waterOC._ctx.fillRect(0, 0, WATER_ZONE.w, WATER_ZONE.h);
+})();
+
 function drawWater() {
   const wx = Math.round(WATER_ZONE.x - cameraX);
   const wy = Math.round(WATER_ZONE.y - cameraY);
   const ww = WATER_ZONE.w;
   const wh = WATER_ZONE.h;
 
-  // deep water fill
-  const grad = ctx.createLinearGradient(wx, wy, wx, wy + wh);
-  grad.addColorStop(0,   'rgba(20,80,140,0.82)');
-  grad.addColorStop(0.5, 'rgba(8,40,90,0.90)');
-  grad.addColorStop(1,   'rgba(4,18,50,0.97)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(wx, wy, ww, wh);
+  ctx.drawImage(_waterOC, wx, wy);
 
   // surface shimmer lines
   const t = Date.now() * 0.001;
@@ -157,18 +162,23 @@ function drawWater() {
   ctx.restore();
 }
 
+const _water2OC = getOC('water2_fill', WATER_ZONE_2.w, WATER_ZONE_2.h);
+(function() {
+  const g = _water2OC._ctx.createLinearGradient(0, 0, 0, WATER_ZONE_2.h);
+  g.addColorStop(0,   'rgba(20,80,140,0.82)');
+  g.addColorStop(0.5, 'rgba(8,40,90,0.90)');
+  g.addColorStop(1,   'rgba(4,18,50,0.97)');
+  _water2OC._ctx.fillStyle = g;
+  _water2OC._ctx.fillRect(0, 0, WATER_ZONE_2.w, WATER_ZONE_2.h);
+})();
+
 function drawWater2() {
   const wx = Math.round(WATER_ZONE_2.x - cameraX);
   const wy = Math.round(WATER_ZONE_2.y - cameraY);
   const ww = WATER_ZONE_2.w;
   const wh = WATER_ZONE_2.h;
 
-  const grad = ctx.createLinearGradient(wx, wy, wx, wy + wh);
-  grad.addColorStop(0,   'rgba(20,80,140,0.82)');
-  grad.addColorStop(0.5, 'rgba(8,40,90,0.90)');
-  grad.addColorStop(1,   'rgba(4,18,50,0.97)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(wx, wy, ww, wh);
+  ctx.drawImage(_water2OC, wx, wy);
 
   const t = Date.now() * 0.001;
   ctx.save();
@@ -182,18 +192,31 @@ function drawWater2() {
   ctx.restore();
 }
 
-function drawBg() {
-  const grad = ctx.createLinearGradient(0, 0, 0, VIEW_H);
-  grad.addColorStop(0, '#0d0521');
-  grad.addColorStop(1, '#1a0a3e');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+// Pre-rendered background gradient (static, never changes)
+const _bgOC = getOC('bg_grad', VIEW_W, VIEW_H);
+(function() {
+  const g = _bgOC._ctx.createLinearGradient(0, 0, 0, VIEW_H);
+  g.addColorStop(0, '#0d0521');
+  g.addColorStop(1, '#1a0a3e');
+  _bgOC._ctx.fillStyle = g;
+  _bgOC._ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+})();
 
-  ctx.fillStyle = '#fff';
+function drawBg() {
+  ctx.drawImage(_bgOC, 0, 0);
+
+  const t = Date.now() * 0.001;
+  // stars: use fillRect for 1px stars, arc only for larger
   for (const s of stars) {
     const sx = ((s.x - cameraX * s.speed) % WORLD_W + WORLD_W) % WORLD_W;
-    ctx.globalAlpha = 0.7 + Math.sin(Date.now() * 0.001 + s.x) * 0.3;
-    ctx.beginPath(); ctx.arc(sx, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 0.7 + Math.sin(t + s.x) * 0.3;
+    if (s.r <= 1) {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(Math.round(sx), s.y, 1, 1);
+    } else {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(sx, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+    }
   }
   ctx.globalAlpha = 1;
 
@@ -207,20 +230,19 @@ function drawBg() {
 }
 
 function drawRain() {
-  ctx.save();
+  // update positions
   for (const d of raindrops) {
-    d.y += d.speed;
-    d.x -= 1;
+    d.y += d.speed; d.x -= 1;
     if (d.y > VIEW_H) { d.y = -d.len; d.x = Math.floor(Math.random() * VIEW_W); }
     if (d.x < 0) d.x += VIEW_W;
-    const x = Math.floor(d.x);
-    const y = Math.floor(d.y);
-    ctx.globalAlpha = 0.18;
-    ctx.fillStyle = '#a0c4ff';
-    ctx.fillRect(x, y, 1, d.len);
-    ctx.globalAlpha = 0.28;
-    ctx.fillRect(x, y, 1, 1);
   }
+  // draw all streaks in one pass, then all tips in one pass
+  ctx.save();
+  ctx.globalAlpha = 0.18;
+  ctx.fillStyle = '#a0c4ff';
+  for (const d of raindrops) ctx.fillRect(Math.floor(d.x), Math.floor(d.y), 1, d.len);
+  ctx.globalAlpha = 0.28;
+  for (const d of raindrops) ctx.fillRect(Math.floor(d.x), Math.floor(d.y), 1, 1);
   ctx.globalAlpha = 1;
   ctx.restore();
 }
@@ -229,6 +251,8 @@ function drawPlatforms() {
   for (const p of platforms) {
     const sx = Math.round(p.x - cameraX);
     const sy = Math.round(p.y - cameraY);
+    // cull offscreen
+    if (sx + p.w < 0 || sx > VIEW_W || sy + p.h < 0 || sy > VIEW_H) continue;
 
     if (p.oneWay) {
       // small floating platform — simple brown plank with grass tuft
