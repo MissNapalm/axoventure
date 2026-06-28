@@ -269,8 +269,8 @@ function updatePlayer() {
   if (player.onGround) { player.dashing = false; player.dashTarget = null; player.homingUsed = false; player.airDashUsed = false; }
 
   cameraX += ((player.x - VIEW_W / 2 + player.w / 2) - cameraX) * 0.12;
-  cameraY += ((player.y - VIEW_H / 2 + player.h / 2) - cameraY) * 0.08;
-  if (cameraY < 0) cameraY = 0;
+  const targetY = Math.max(0, player.y - VIEW_H / 2 + player.h / 2);
+  cameraY += (targetY - cameraY) * 0.08;
 
   if (player.moving && player.onGround) {
     player.frameTimer++;
