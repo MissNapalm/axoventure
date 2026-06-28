@@ -46,7 +46,6 @@ function drawHUD() {
   if (combo.count >= 2 || combo.displayTimer > 0) {
     const isExpiring = combo.displayTimer > 0;
     const alpha = isExpiring ? Math.min(1, combo.displayTimer / 30) : 1;
-    const pulse = !isExpiring && Math.floor(Date.now() / 150) % 2 === 0 ? 1.1 : 1;
     const cx = VIEW_W - 6;
     const cy = 6;
 
@@ -57,10 +56,7 @@ function drawHUD() {
     // combo count
     ctx.font = '16px "Press Start 2P"';
     ctx.fillStyle = combo.count >= 10 ? '#ff4400' : combo.count >= 5 ? '#ffaa00' : '#ffffff';
-    ctx.shadowColor = ctx.fillStyle;
-    ctx.shadowBlur = pulse > 1 ? 8 : 0;
     ctx.fillText(`x${combo.count}`, cx, cy + 14);
-    ctx.shadowBlur = 0;
 
     // label
     ctx.font = PIXEL_FONT_SM;

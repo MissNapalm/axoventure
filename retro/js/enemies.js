@@ -858,12 +858,19 @@ function drawBigFish() {
     }
     ctx.imageSmoothingEnabled = false;
     const drawOC = e['_oc_' + variant];
-    ctx.drawImage(drawOC, -W/2, -H/2, W, H);
     if (e.hitFlash > 0 && !flash) {
-      ctx.globalAlpha = e.hitFlash / HIT_FLASH_FRAMES * 0.6;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(-W/2, -H/2, W, H);
-      ctx.globalAlpha = 1;
+      const hoc = getOC('bigfish_hit', W, H);
+      hoc._ctx.clearRect(0, 0, W, H);
+      hoc._ctx.drawImage(drawOC, 0, 0);
+      hoc._ctx.globalCompositeOperation = 'source-atop';
+      hoc._ctx.globalAlpha = e.hitFlash / HIT_FLASH_FRAMES * 0.8;
+      hoc._ctx.fillStyle = '#ffffff';
+      hoc._ctx.fillRect(0, 0, W, H);
+      hoc._ctx.globalCompositeOperation = 'source-over';
+      hoc._ctx.globalAlpha = 1;
+      ctx.drawImage(hoc, -W/2, -H/2, W, H);
+    } else {
+      ctx.drawImage(drawOC, -W/2, -H/2, W, H);
     }
 
     ctx.restore();
