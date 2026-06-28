@@ -522,8 +522,8 @@ function drawFish() {
     }
 
     ctx.imageSmoothingEnabled = false;
-    if (flashColor > 0) {
-      const woc = getOC('fish_flash', e.w, e.h);
+    if (flashColor > 0 && e._oc) {
+      const woc = getOC('fish_flash_' + fishEnemies.indexOf(e), e.w, e.h);
       woc._ctx.clearRect(0, 0, e.w, e.h);
       woc._ctx.drawImage(e._oc, 0, 0);
       woc._ctx.globalCompositeOperation = 'source-atop';
@@ -531,7 +531,7 @@ function drawFish() {
       woc._ctx.fillRect(0, 0, e.w, e.h);
       woc._ctx.globalCompositeOperation = 'source-over';
       ctx.drawImage(woc, -e.w / 2, -e.h / 2, e.w, e.h);
-    } else {
+    } else if (e._oc) {
       ctx.drawImage(e._oc, -e.w / 2, -e.h / 2, e.w, e.h);
     }
 
