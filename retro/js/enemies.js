@@ -232,14 +232,14 @@ function updateRedEnemies() {
     // contact with player: dashing/homing flips them, walking hurts Axo
     if (!player.dashing && !player.groundDashing) {
       const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
-      const oy = Math.min(player.y + player.h, e.y + e.h) - Math.max(player.y, e.y);
+      const oy = Math.min(player.y + player.h, e._y + e.h) - Math.max(player.y, e._y);
       if (ox > 0 && oy > 0) {
         // push player out
         if (ox < oy) {
           player.x += player.x + player.w / 2 < e.x + e.w / 2 ? -ox : ox;
           player.vx = 0;
         } else {
-          player.y += player.y + player.h / 2 < e.y + e.h / 2 ? -oy : oy;
+          player.y += player.y + player.h / 2 < e._y + e.h / 2 ? -oy : oy;
           player.vy = 0;
         }
         if (player.hurtTimer === 0) hurtPlayer();

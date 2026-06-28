@@ -430,20 +430,22 @@ function updatePlayer() {
         player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
       } else {
         const spiked = e.shakeTimer > 0 || e.stunTimer > 0;
-        player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
-        player.vy = -4;
-        const wasLastDash = e.lastHitBy === 'dash';
-        hitEnemy(e);
-        hitFreezeTimer = HIT_FREEZE_FRAMES;
-        screenShakeTimer = SCREEN_SHAKE_FRAMES;
-        spawnImpactVFX(impactX, impactY);
         if (spiked) {
           hurtPlayer();
-        } else if (e.dead) {
-          player.killText = { text: wasLastDash ? 'ONE-TWO HIT!' : 'HOMING HIT!', timer: 60, x: impactX, y: impactY - 12 };
         } else {
-          player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
-          if (player.postDashTimer === 0) player.postDashTimer = 20;
+          player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
+          player.vy = -4;
+          const wasLastDash = e.lastHitBy === 'dash';
+          hitEnemy(e);
+          hitFreezeTimer = HIT_FREEZE_FRAMES;
+          screenShakeTimer = SCREEN_SHAKE_FRAMES;
+          spawnImpactVFX(impactX, impactY);
+          if (e.dead) {
+            player.killText = { text: wasLastDash ? 'ONE-TWO HIT!' : 'HOMING HIT!', timer: 60, x: impactX, y: impactY - 12 };
+          } else {
+            player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
+            if (player.postDashTimer === 0) player.postDashTimer = 20;
+          }
         }
       }
     }
@@ -476,19 +478,21 @@ function updatePlayer() {
           screenShakeTimer = SCREEN_SHAKE_FRAMES;
         } else {
           const spiked = e.shakeTimer > 0 || e.stunTimer > 0;
-          player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
-          player.vy = -4;
-          const ex = e.x + e.w / 2, ey = (e._y ? e._y : e.y) + e.h / 2;
-          e.lastHitBy = !spiked ? 'dash' : null;
-          hitEnemy(e);
-          hitFreezeTimer = HIT_FREEZE_FRAMES;
-          screenShakeTimer = SCREEN_SHAKE_FRAMES;
-          spawnImpactVFX(ex, ey);
           if (spiked) {
             hurtPlayer();
-          } else if (!e.dead) {
-            player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
-            if (player.postDashTimer === 0) player.postDashTimer = 20;
+          } else {
+            player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
+            player.vy = -4;
+            const ex = e.x + e.w / 2, ey = (e._y ? e._y : e.y) + e.h / 2;
+            e.lastHitBy = 'dash';
+            hitEnemy(e);
+            hitFreezeTimer = HIT_FREEZE_FRAMES;
+            screenShakeTimer = SCREEN_SHAKE_FRAMES;
+            spawnImpactVFX(ex, ey);
+            if (!e.dead) {
+              player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
+              if (player.postDashTimer === 0) player.postDashTimer = 20;
+            }
           }
         }
         break;
