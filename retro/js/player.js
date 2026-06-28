@@ -408,7 +408,7 @@ function drawPlayer() {
       player.facingLeft = player.dashTarget.x + player.dashTarget.w / 2 < player.x + player.w / 2;
     }
   } else if (player.groundDashing) {
-    sprite = sprites['walk2'];
+    sprite = sprites['jump'];
   } else if (!player.onGround) {
     sprite = sprites['jump'];
   } else if (player.moving) {
@@ -461,21 +461,6 @@ function drawPlayer() {
       ctx.scale(-1, 1);
     } else {
       ctx.rotate(snapped + Math.PI);
-      ctx.scale(-1, 1);
-    }
-    ctx.drawImage(drawSpr, -sw / 2, -sh / 2, sw, sh);
-  } else if (player.groundDashing && Math.abs(Math.sin(player.groundDashAngle)) > 0.1) {
-    // angled ground dash — rotate sprite to face dash direction
-    const pcx = player.x + player.w / 2 - cameraX;
-    const pcy = player.y + player.h / 2 - cameraY;
-    const angle = player.groundDashAngle;
-    ctx.translate(pcx, pcy);
-    // flip if going left half
-    if (Math.cos(angle) < 0) {
-      ctx.scale(-1, 1);
-      ctx.rotate(-angle);
-    } else {
-      ctx.rotate(angle);
       ctx.scale(-1, 1);
     }
     ctx.drawImage(drawSpr, -sw / 2, -sh / 2, sw, sh);
