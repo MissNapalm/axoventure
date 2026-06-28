@@ -451,6 +451,17 @@ function updateFish() {
     e.x += e.vx;
     if (e.x <= e.swimLeft)             { e.x = e.swimLeft;         e.vx =  Math.abs(e.vx); }
     if (e.x + e.w >= e.swimRight)      { e.x = e.swimRight - e.w;  e.vx = -Math.abs(e.vx); }
+    // wall collision against solid platforms
+    for (const p of platforms) {
+      if (p.oneWay) continue;
+      const ox = Math.min(e.x + e.w, p.x + p.w) - Math.max(e.x, p.x);
+      const oy = Math.min(e.y + e.h, p.y + p.h) - Math.max(e.y, p.y);
+      if (ox > 0 && oy > 0) {
+        // push out horizontally and reverse
+        if (e.x + e.w / 2 < p.x + p.w / 2) { e.x = p.x - e.w; e.vx = -Math.abs(e.vx); }
+        else                                  { e.x = p.x + p.w; e.vx =  Math.abs(e.vx); }
+      }
+    }
 
     // hurt player on contact unless dashing/homing/dead
     if (!e.dead && !player.dashing && !player.groundDashing && player.hurtTimer === 0 && player.postDashTimer === 0) {
