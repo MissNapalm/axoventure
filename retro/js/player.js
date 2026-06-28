@@ -26,6 +26,7 @@ const player = {
   homingWindupTarget: null,
   shockwaves: [],
   sparks: [],
+  impactFlash: 0,
 };
 
 function resetLevel() {
@@ -38,6 +39,7 @@ function resetLevel() {
   player.homingWindup = 0; player.homingWindupTarget = null;
   player.shockwaves = [];
   player.sparks = [];
+  player.impactFlash = 0;
   player.carrying = null;
   player.groundDashing = false; player.groundDashTimer = 0; player.airDashUsed = false; player.knockbackTimer = 0;
   cameraX = 0;
@@ -95,15 +97,31 @@ function resolveCollisions() {
 }
 
 function spawnImpactVFX(x, y) {
-  // 3 staggered rings
-  player.shockwaves.push({ x, y, r: 2,  life: 20, maxLife: 20, speed: 6,   color: '#ffffff' });
-  player.shockwaves.push({ x, y, r: 2,  life: 16, maxLife: 16, speed: 4,   color: '#a0e8ff', delay: 3 });
-  player.shockwaves.push({ x, y, r: 2,  life: 12, maxLife: 12, speed: 2.5, color: '#40c0ff', delay: 6 });
-  // 8 spark lines radiating outward
-  for (let i = 0; i < 8; i++) {
-    const angle = (i / 8) * Math.PI * 2;
-    const speed = 2.5 + Math.random() * 1.5;
-    player.sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 10, maxLife: 10 });
+  // screen flash
+  player.impactFlash = 6;
+
+  // 6 staggered rings — white burst then electric blue cascade
+  player.shockwaves.push({ x, y, r: 4,  life: 22, maxLife: 22, speed: 9,   color: '#ffffff',  lw: 3, delay: 0 });
+  player.shockwaves.push({ x, y, r: 4,  life: 20, maxLife: 20, speed: 6,   color: '#c0f0ff',  lw: 2, delay: 2 });
+  player.shockwaves.push({ x, y, r: 4,  life: 18, maxLife: 18, speed: 4.5, color: '#60d0ff',  lw: 2, delay: 4 });
+  player.shockwaves.push({ x, y, r: 4,  life: 16, maxLife: 16, speed: 3,   color: '#20a0ff',  lw: 1.5, delay: 7 });
+  player.shockwaves.push({ x, y, r: 4,  life: 14, maxLife: 14, speed: 7,   color: '#ffffff',  lw: 1, delay: 10 });
+  player.shockwaves.push({ x, y, r: 4,  life: 10, maxLife: 10, speed: 11,  color: '#ffffff',  lw: 1, delay: 12 });
+
+  // 16 spark lines — two rings, inner fast short, outer slow long
+  for (let i = 0; i < 16; i++) {
+    const angle = (i / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+    const inner = i % 2 === 0;
+    const speed = inner ? 4 + Math.random() * 2 : 2 + Math.random() * 1.5;
+    const life  = inner ? 8 + Math.floor(Math.random() * 4) : 14 + Math.floor(Math.random() * 6);
+    player.sparks.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life, maxLife: life,
+      color: inner ? '#ffffff' : '#80e0ff',
+      lw: inner ? 2 : 1.5,
+    });
   }
 }
 
@@ -213,7 +231,7 @@ function updatePlayer() {
     // snap only for sprite rotation display
     player.dashAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
     // trail
-    player.trail.push({ x: pcx, y: pcy, life: 18 });
+    player.trail.push({ x: pcx, y: pcy, life: 28 });
   }
   if (player.groundDashing) {
     player.trail.push({ x: player.x + player.w / 2, y: player.y + player.h / 2, life: 18 });
@@ -453,6 +471,16 @@ function drawPlayer() {
     }
   }
 
+  // full-screen white flash on impact
+  if (player.impactFlash > 0) {
+    player.impactFlash--;
+    ctx.save();
+    ctx.globalAlpha = (player.impactFlash / 6) * 0.5;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+    ctx.restore();
+  }
+
   // shockwave rings expanding outward from impact
   for (let i = player.shockwaves.length - 1; i >= 0; i--) {
     const sw = player.shockwaves[i];
@@ -464,7 +492,7 @@ function drawPlayer() {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = sw.color;
-    ctx.lineWidth = 2;
+    ctx.lineWidth = sw.lw || 2;
     ctx.beginPath();
     ctx.arc(Math.round(sw.x - cameraX), Math.round(sw.y - cameraY), sw.r, 0, Math.PI * 2);
     ctx.stroke();
@@ -479,8 +507,8 @@ function drawPlayer() {
     const alpha = sp.life / sp.maxLife;
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = sp.color || '#ffffff';
+    ctx.lineWidth = sp.lw || 1.5;
     ctx.beginPath();
     ctx.moveTo(Math.round(sp.x - cameraX), Math.round(sp.y - cameraY));
     sp.x += sp.vx; sp.y += sp.vy;
