@@ -856,6 +856,7 @@ function hitBigFishByDash(e, ex, ey) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function hitEnemy(e) {
+  if (e.shakeTimer > 0 || e.stunTimer > 0) return; // invincible in spike mode
   e.hp--;
   e.hitFlash = HIT_FLASH_FRAMES;
   e.hitTextTimer = 40;
@@ -899,7 +900,7 @@ function updateEnemies() {
     if (e.hitFlash > 0) e.hitFlash--;
     if (e.shakeTimer > 0) {
       e.shakeTimer--;
-      if (e.shakeTimer === 0) e.stunTimer = S.stunFrames;
+      if (e.shakeTimer === 0) { e.stunTimer = S.stunFrames; e.lastHitBy = null; }
       continue;
     }
     if (e.stunTimer > 0) {
@@ -1007,18 +1008,5 @@ function drawEnemies() {
 
     ctx.restore();
 
-    // HIT! text floats up above enemy
-    if (e.hitTextTimer > 0) {
-      const progress = 1 - e.hitTextTimer / 40;
-      const floatY = sy - 4 - Math.round(progress * 12);
-      ctx.save();
-      ctx.font = PIXEL_FONT;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.globalAlpha = e.hitTextTimer / 40;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText('HIT!', sx + e.w / 2, floatY);
-      ctx.restore();
-    }
   }
 }

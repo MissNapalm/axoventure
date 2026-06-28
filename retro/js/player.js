@@ -35,6 +35,7 @@ const player = {
   inWater: false,
   bubbles: [],
   bubbleTimer: 0,
+  postDashTimer: 0,
 };
 
 function resetLevel() {
@@ -55,6 +56,7 @@ function resetLevel() {
   player.inWater = false;
   player.bubbles = [];
   player.bubbleTimer = 0;
+  player.postDashTimer = 0;
   cameraX = 0;
   cameraY = 0;
   hitFreezeTimer = 0;
@@ -101,7 +103,7 @@ function resetLevel() {
 }
 
 function hurtPlayer() {
-  if (player.hurtTimer > 0 || coderMode || player.dashing || player.groundDashing || player.homingWindup > 0) return;
+  if (player.hurtTimer > 0 || player.postDashTimer > 0 || coderMode || player.dashing || player.groundDashing || player.homingWindup > 0) return;
   player.hp--;
   player.hurtTimer = HURT_FRAMES;
   player.dashing = false; player.dashTarget = null;
@@ -327,6 +329,7 @@ function updatePlayer() {
   if (jumpPressed && player.onGround && !player.inWater) { player.vy = -S.jumpForce; player.onGround = false; }
 
   if (player.hurtTimer > 0) player.hurtTimer--;
+  if (player.postDashTimer > 0) player.postDashTimer--;
 
   if (player.killSpin > 0) player.killSpin--;
 
@@ -436,7 +439,7 @@ function updatePlayer() {
         if (e.dead) player.killText = { text: wasLastDash ? 'ONE-TWO HIT!' : 'HOMING HIT!', timer: 60, x: impactX, y: impactY - 12 };
         else {
           player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
-          if (player.hurtTimer === 0) player.hurtTimer = 20;
+          if (player.postDashTimer === 0) player.postDashTimer = 20;
         }
       }
     }
@@ -478,7 +481,7 @@ function updatePlayer() {
           spawnImpactVFX(ex, ey);
           if (!e.dead) {
             player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
-            if (player.hurtTimer === 0) player.hurtTimer = 20;
+            if (player.postDashTimer === 0) player.postDashTimer = 20;
           }
         }
         break;
