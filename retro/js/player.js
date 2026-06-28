@@ -101,7 +101,7 @@ function resetLevel() {
 }
 
 function hurtPlayer() {
-  if (player.hurtTimer > 0 || coderMode) return;
+  if (player.hurtTimer > 0 || coderMode || player.dashing || player.groundDashing || player.homingWindup > 0) return;
   player.hp--;
   player.hurtTimer = HURT_FRAMES;
   player.dashing = false; player.dashTarget = null;
