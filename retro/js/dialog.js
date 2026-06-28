@@ -20,8 +20,10 @@ function openDialog(npc) {
 function advanceDialog() {
   dialog.page++;
   if (dialog.page >= dialog.npc.lines.length) {
+    const closedNpc = dialog.npc;
     dialog.active = false;
     dialog.npc = null;
+    if (typeof onDialogClose === 'function') onDialogClose(closedNpc);
   } else {
     dialog.chars = 0;
     dialog.charTimer = 0;

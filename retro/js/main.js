@@ -5,6 +5,22 @@ canvas.style.height = VIEW_H * SCALE + 'px';
 ctx.imageSmoothingEnabled = false;
 
 function loop() {
+  if (levelComplete) {
+    updateItems(); // keeps timer ticking
+    ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+    drawBg(); drawLightning(); drawRain(); drawWater(); drawWater2(); drawPlatforms();
+    drawNpcs(); drawEnemies(); drawRedEnemies(); drawFish(); drawBigFish();
+    drawOrange(); drawGoldenKey();
+    drawPlayer();
+    drawCarriedRedEnemies();
+    drawDialog();
+    drawSettings();
+    drawHUD();
+    drawLevelComplete();
+    requestAnimationFrame(loop);
+    return;
+  }
+
   if (death.active) {
     death.timer++;
     if (death.timer < death.freezeEnd) {
@@ -22,7 +38,7 @@ function loop() {
     }
 
     ctx.clearRect(0, 0, VIEW_W, VIEW_H);
-    drawBg(); drawRain(); drawWater(); drawPlatforms();
+    drawBg(); drawRain(); drawWater(); drawWater2(); drawPlatforms();
 
     // draw axo frozen/dead — use walk1, no flicker, centred where he died
     if (assetsReady()) {
@@ -62,6 +78,7 @@ function loop() {
     updateFish();
     updateBigFish();
     updateLightning();
+    updateItems();
   }
 
   ctx.clearRect(0, 0, VIEW_W, VIEW_H);
@@ -80,12 +97,15 @@ function loop() {
   drawLightning();
   drawRain();
   drawWater();
+  drawWater2();
   drawPlatforms();
   drawNpcs();
   drawEnemies();
   drawRedEnemies();
   drawFish();
   drawBigFish();
+  drawOrange();
+  drawGoldenKey();
   drawPlayer();
   drawCarriedRedEnemies();
 

@@ -59,6 +59,18 @@ function resetLevel() {
   cameraY = 0;
   hitFreezeTimer = 0;
   screenShakeTimer = 0;
+  // reset quest state
+  hasOrange = false;
+  edwinGaveKey = false;
+  edwinPhase = 'pre';
+  orange.collected = false;
+  goldenKey.active = false;
+  goldenKey.collected = false;
+  levelComplete = false;
+  levelCompleteTimer = 0;
+  // reset edwin2 sprite back
+  const edwin2 = npcs.find(n => n.id === 'edwin2');
+  if (edwin2) edwin2.sprite = 'capy2';
   // reset big fish
   for (const e of bigFishEnemies) {
     e.x = e.startX; e.y = e.startY;
@@ -244,6 +256,9 @@ function updatePlayer() {
   player.inWater = (
     pcx >= WATER_ZONE.x && pcx <= WATER_ZONE.x + WATER_ZONE.w &&
     pcy >= WATER_ZONE.y && pcy <= WATER_ZONE.y + WATER_ZONE.h
+  ) || (
+    pcx >= WATER_ZONE_2.x && pcx <= WATER_ZONE_2.x + WATER_ZONE_2.w &&
+    pcy >= WATER_ZONE_2.y && pcy <= WATER_ZONE_2.y + WATER_ZONE_2.h
   );
 
   // bubble spawning from axo's mouth
@@ -418,7 +433,8 @@ function updatePlayer() {
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         screenShakeTimer = SCREEN_SHAKE_FRAMES;
         spawnImpactVFX(impactX, impactY);
-        if (e.dead) player.killText = { text: wasLastDash ? 'ONE-TWO HIT!' : 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
+        if (e.dead) player.killText = { text: wasLastDash ? 'ONE-TWO HIT!' : 'HOMING HIT!', timer: 60, x: impactX, y: impactY - 12 };
+        else player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
       }
     }
   }
@@ -451,12 +467,12 @@ function updatePlayer() {
           player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
           player.vy = -4;
           const ex = e.x + e.w / 2, ey = (e._y ? e._y : e.y) + e.h / 2;
-          e.lastHitBy = 'dash';
+          e.lastHitBy = e.shakeTimer === 0 && e.stunTimer === 0 ? 'dash' : null;
           hitEnemy(e);
           hitFreezeTimer = HIT_FREEZE_FRAMES;
           screenShakeTimer = SCREEN_SHAKE_FRAMES;
           spawnImpactVFX(ex, ey);
-          player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
+          if (!e.dead) player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
         }
         break;
       }
