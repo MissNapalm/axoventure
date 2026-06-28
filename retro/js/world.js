@@ -22,8 +22,8 @@ const WATER_FLOOR_Y = WATER_ZONE.y + WATER_ZONE.h;
 // Second land section ground level
 const LAND2_Y = 210;
 
-// Second water zone (small pool the orange is in — accessible via a hole in the land)
-const WATER_ZONE_2 = { x: 4820, y: 230, w: 340, h: 340 };
+// Second water zone: the small pool Edgar sits next to — swimmable, orange is at the bottom
+const WATER_ZONE_2 = { x: 4500, y: 230, w: 200, h: 300 };
 const WATER_FLOOR_Y_2 = WATER_ZONE_2.y + WATER_ZONE_2.h;
 
 const platforms = [
@@ -57,27 +57,19 @@ const platforms = [
   { x: WATER_ZONE.x + WATER_ZONE.w, y: WATER_ZONE.y, w: 40, h: WATER_ZONE.h + 80, color: '#1a1a2e' },
 
   // ── Second land section ──────────────────────────────────────────────────
-  // Left land chunk (from water zone right wall to pool edge)
+  // Left land chunk: right wall of water zone up to the pool
   { x: 4240, y: LAND2_Y, w: WATER_ZONE_2.x - 4240, h: 400, color: '#3d2b1f' },
-  // Right land chunk (after pool to end of level)
-  { x: WATER_ZONE_2.x + WATER_ZONE_2.w, y: LAND2_Y, w: 900, h: 400, color: '#3d2b1f' },
-  // Floating platforms in second land section
-  { x: 4290, y: 175, w: 70,  h: 8, color: '#5c3d2e', oneWay: true },
-  { x: 4430, y: 155, w: 80,  h: 8, color: '#5c3d2e', oneWay: true },
-  // Floor of second pool
+  // Right land chunk: after the pool onward
+  { x: WATER_ZONE_2.x + WATER_ZONE_2.w, y: LAND2_Y, w: 1200, h: 400, color: '#3d2b1f' },
+  // Floor of the pool
   { x: WATER_ZONE_2.x, y: WATER_FLOOR_Y_2, w: WATER_ZONE_2.w, h: 80, color: '#1a1a2e' },
-  // Left wall of second pool
+  // Left wall of the pool
   { x: WATER_ZONE_2.x - 20, y: WATER_ZONE_2.y, w: 20, h: WATER_ZONE_2.h + 80, color: '#1a1a2e' },
-  // Right wall of second pool (same slab as right land chunk's edge — no separate needed)
-  // Ledges inside the second pool so player can get out
-  { x: WATER_ZONE_2.x + 10,                   y: WATER_ZONE_2.y + 200, w: 80, h: 8, color: '#1e2a3a', oneWay: true },
-  { x: WATER_ZONE_2.x + WATER_ZONE_2.w - 90,  y: WATER_ZONE_2.y + 130, w: 80, h: 8, color: '#1e2a3a', oneWay: true },
-  // Step-down platforms into the pool from the left
-  { x: WATER_ZONE_2.x - 100, y: LAND2_Y + 35,  w: 70, h: 8, color: '#5c3d2e', oneWay: true },
-  { x: WATER_ZONE_2.x - 50,  y: LAND2_Y + 90,  w: 60, h: 8, color: '#5c3d2e', oneWay: true },
-  // Floating platforms after the pool
-  { x: 5220, y: 165, w: 80, h: 8, color: '#5c3d2e', oneWay: true },
-  { x: 5360, y: 145, w: 75, h: 8, color: '#5c3d2e', oneWay: true },
+  // Right wall of the pool
+  { x: WATER_ZONE_2.x + WATER_ZONE_2.w, y: WATER_ZONE_2.y, w: 20, h: WATER_ZONE_2.h + 80, color: '#1a1a2e' },
+  // Ledge inside pool so player can climb out
+  { x: WATER_ZONE_2.x + 10, y: WATER_ZONE_2.y + 160, w: 60, h: 8, color: '#1e2a3a', oneWay: true },
+  { x: WATER_ZONE_2.x + WATER_ZONE_2.w - 70, y: WATER_ZONE_2.y + 100, w: 60, h: 8, color: '#1e2a3a', oneWay: true },
 ];
 
 const WORLD_W = 6100;

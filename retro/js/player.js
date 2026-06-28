@@ -62,15 +62,14 @@ function resetLevel() {
   // reset quest state
   hasOrange = false;
   edwinGaveKey = false;
-  edwinPhase = 'pre';
   orange.collected = false;
   goldenKey.active = false;
   goldenKey.collected = false;
   levelComplete = false;
   levelCompleteTimer = 0;
-  // reset edwin2 sprite back
-  const edwin2 = npcs.find(n => n.id === 'edwin2');
-  if (edwin2) edwin2.sprite = 'capy2';
+  // reset Edwin sprite back to capy2
+  const edwinNpc = npcs.find(n => n.id === 'edwin');
+  if (edwinNpc) edwinNpc.sprite = 'capy2';
   // reset big fish
   for (const e of bigFishEnemies) {
     e.x = e.startX; e.y = e.startY;

@@ -9,8 +9,8 @@ const orange = {
 };
 
 const goldenKey = {
-  x: 4970,
-  y: LAND2_Y - 20,
+  x: 1640,
+  y: GROUND_Y - 20,
   w: 14, h: 10,
   active: false,
   collected: false,
@@ -23,8 +23,9 @@ let levelCompleteTimer = 0;
 function spawnGoldenKey() {
   goldenKey.active = true;
   goldenKey.collected = false;
-  goldenKey.x = 4970;
-  goldenKey.y = LAND2_Y - 20;
+  // spawns near Edwin on the first island
+  goldenKey.x = 1640;
+  goldenKey.y = GROUND_Y - 20;
 }
 
 function updateItems() {
