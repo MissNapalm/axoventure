@@ -153,10 +153,20 @@ function updatePlayer() {
         openDialog(nearby);
       } else if (!player.groundDashing) {
         if (player.onGround || (!player.airDashUsed && !player.dashing)) {
+          const dLeft  = keys['KeyS'];
+          const dRight = keys['KeyC'];
+          const dUp    = keys['KeyD'] || keys['KeyL'];
+          const dDown  = keys['ShiftLeft'] || keys['ShiftRight'];
+          const dx = dRight ? 1 : dLeft ? -1 : (player.facingLeft ? -1 : 1);
+          const dy = dUp ? -1 : dDown ? 1 : 0;
+          const len = Math.hypot(dx, dy);
+          const nx = dx / len;
+          const ny = dy / len;
           player.groundDashing = true;
           player.groundDashTimer = GROUND_DASH_FRAMES;
-          player.vx = player.facingLeft ? -GROUND_DASH_SPEED : GROUND_DASH_SPEED;
-          player.vy = 0;
+          player.vx = nx * GROUND_DASH_SPEED;
+          player.vy = ny * GROUND_DASH_SPEED;
+          player.facingLeft = nx < 0;
           if (!player.onGround) player.airDashUsed = true;
         }
       }
