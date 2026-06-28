@@ -233,7 +233,7 @@ function updatePlayer() {
         player.knockbackTimer = 12;
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         screenShakeTimer = SCREEN_SHAKE_FRAMES;
-        player.shockwaves.push({ x: impactX, y: impactY, r: 2, life: 18, maxLife: 18 });
+        player.shockwaves.push({ x: impactX, y: impactY, r: 4, life: 22, maxLife: 22 });
       } else if (e.stunTimer > 0) {
         hurtPlayer();
       } else {
@@ -242,7 +242,7 @@ function updatePlayer() {
         hitEnemy(e);
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         screenShakeTimer = SCREEN_SHAKE_FRAMES;
-        player.shockwaves.push({ x: impactX, y: impactY, r: 2, life: 18, maxLife: 18 });
+        player.shockwaves.push({ x: impactX, y: impactY, r: 4, life: 22, maxLife: 22 });
       }
     }
   }
@@ -322,7 +322,7 @@ function drawPlayer() {
       ctx.save();
       ctx.globalAlpha = t * 0.85;
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = t * 9;
+      ctx.lineWidth = t * 18;
       ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(a.x - cameraX, a.y - cameraY);
@@ -360,14 +360,14 @@ function drawPlayer() {
 
   // build tinted sprite on offscreen canvas
   let drawSpr = sprite;
-  if (player.dashing || player.groundDashing || player.hurtTimer > 0) {
+  if (player.dashing || player.groundDashing || player.homingWindup > 0 || player.hurtTimer > 0) {
     const oc = document.createElement('canvas');
     oc.width = sw; oc.height = sh;
     const oc2d = oc.getContext('2d');
     oc2d.imageSmoothingEnabled = false;
     oc2d.drawImage(sprite, 0, 0, sw, sh);
     oc2d.globalCompositeOperation = 'source-atop';
-    oc2d.fillStyle = (player.dashing || player.groundDashing) ? 'rgba(255,255,255,0.9)' : 'rgba(255,0,0,0.55)';
+    oc2d.fillStyle = (player.hurtTimer > 0 && !player.dashing && !player.homingWindup) ? 'rgba(255,0,0,0.55)' : 'rgba(255,255,255,0.9)';
     oc2d.fillRect(0, 0, sw, sh);
     drawSpr = oc;
   }
@@ -418,7 +418,7 @@ function drawPlayer() {
   for (let i = player.shockwaves.length - 1; i >= 0; i--) {
     const sw = player.shockwaves[i];
     sw.life--;
-    sw.r += 3.5;
+    sw.r += 5.5;
     if (sw.life <= 0) { player.shockwaves.splice(i, 1); continue; }
     const alpha = sw.life / sw.maxLife;
     ctx.save();
