@@ -25,6 +25,7 @@ const player = {
   homingWindup: 0,
   homingWindupTarget: null,
   shockwaves: [],
+  sparks: [],
 };
 
 function resetLevel() {
@@ -36,6 +37,7 @@ function resetLevel() {
   player.dashing = false; player.dashTarget = null;
   player.homingWindup = 0; player.homingWindupTarget = null;
   player.shockwaves = [];
+  player.sparks = [];
   player.carrying = null;
   player.groundDashing = false; player.groundDashTimer = 0; player.airDashUsed = false; player.knockbackTimer = 0;
   cameraX = 0;
@@ -89,6 +91,19 @@ function resolveCollisions() {
         else { player.y += oy; player.vy = 0; }
       }
     }
+  }
+}
+
+function spawnImpactVFX(x, y) {
+  // 3 staggered rings
+  player.shockwaves.push({ x, y, r: 2,  life: 20, maxLife: 20, speed: 6,   color: '#ffffff' });
+  player.shockwaves.push({ x, y, r: 2,  life: 16, maxLife: 16, speed: 4,   color: '#a0e8ff', delay: 3 });
+  player.shockwaves.push({ x, y, r: 2,  life: 12, maxLife: 12, speed: 2.5, color: '#40c0ff', delay: 6 });
+  // 8 spark lines radiating outward
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const speed = 2.5 + Math.random() * 1.5;
+    player.sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 10, maxLife: 10 });
   }
 }
 
@@ -232,7 +247,7 @@ function updatePlayer() {
         player.knockbackTimer = 12;
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         screenShakeTimer = SCREEN_SHAKE_FRAMES;
-        player.shockwaves.push({ x: impactX, y: impactY, r: 4, life: 22, maxLife: 22 });
+        spawnImpactVFX(impactX, impactY);
       } else if (e.stunTimer > 0) {
         hurtPlayer();
       } else {
@@ -241,7 +256,7 @@ function updatePlayer() {
         hitEnemy(e);
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         screenShakeTimer = SCREEN_SHAKE_FRAMES;
-        player.shockwaves.push({ x: impactX, y: impactY, r: 4, life: 22, maxLife: 22 });
+        spawnImpactVFX(impactX, impactY);
       }
     }
   }
@@ -412,19 +427,64 @@ function drawPlayer() {
     ctx.restore();
   }
 
+  // speed lines during homing dash — thin lines behind player in travel direction
+  if (player.dashing && player.trail.length > 2) {
+    const newest = player.trail[player.trail.length - 1];
+    const older  = player.trail[Math.max(0, player.trail.length - 5)];
+    const dx = newest.x - older.x;
+    const dy = newest.y - older.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = dx / len; const ny = dy / len;
+    for (let i = 0; i < 5; i++) {
+      const spread = (i - 2) * 4;
+      const ox = -ny * spread; const oy = nx * spread;
+      const sx = newest.x - cameraX + ox;
+      const sy = newest.y - cameraY + oy;
+      const lineLen = 8 + i * 2;
+      ctx.save();
+      ctx.globalAlpha = 0.35 - i * 0.04;
+      ctx.strokeStyle = '#c0f0ff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx - nx * lineLen, sy - ny * lineLen);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
   // shockwave rings expanding outward from impact
   for (let i = player.shockwaves.length - 1; i >= 0; i--) {
     const sw = player.shockwaves[i];
+    if (sw.delay > 0) { sw.delay--; continue; }
     sw.life--;
-    sw.r += 5.5;
+    sw.r += sw.speed;
     if (sw.life <= 0) { player.shockwaves.splice(i, 1); continue; }
-    const alpha = sw.life / sw.maxLife;
+    const alpha = (sw.life / sw.maxLife) * 0.9;
     ctx.save();
-    ctx.globalAlpha = alpha * 0.85;
-    ctx.strokeStyle = '#ffffff';
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = sw.color;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(Math.round(sw.x - cameraX), Math.round(sw.y - cameraY), sw.r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // spark lines radiating from impact point
+  for (let i = player.sparks.length - 1; i >= 0; i--) {
+    const sp = player.sparks[i];
+    sp.life--;
+    if (sp.life <= 0) { player.sparks.splice(i, 1); continue; }
+    const alpha = sp.life / sp.maxLife;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(Math.round(sp.x - cameraX), Math.round(sp.y - cameraY));
+    sp.x += sp.vx; sp.y += sp.vy;
+    ctx.lineTo(Math.round(sp.x - cameraX), Math.round(sp.y - cameraY));
     ctx.stroke();
     ctx.restore();
   }
