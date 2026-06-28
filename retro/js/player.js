@@ -495,17 +495,7 @@ function drawPlayer() {
     }
   }
 
-  // full-screen white flash + bloom on impact
-  if (player.impactFlash > 0) {
-    player.impactFlash--;
-    const ft = player.impactFlash / 10;
-    ctx.save();
-    // hard white core flash
-    ctx.globalAlpha = ft * ft * 0.85;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    ctx.restore();
-  }
+  if (player.impactFlash > 0) player.impactFlash--;
 
   // shockwave rings expanding outward from impact
   for (let i = player.shockwaves.length - 1; i >= 0; i--) {
