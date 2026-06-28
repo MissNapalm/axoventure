@@ -18,3 +18,6 @@ const PLAYER_MAX_HP    = 3;
 const HURT_FRAMES      = 60; // 1 second invincibility after hit
 const GROUND_DASH_SPEED  = 7;
 const GROUND_DASH_FRAMES = 14;
+const HIT_FREEZE_FRAMES  = 5;
+const SCREEN_SHAKE_FRAMES = 10;
+const SCREEN_SHAKE_MAG    = 3;

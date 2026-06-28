@@ -35,6 +35,8 @@ function resetLevel() {
   player.groundDashing = false; player.groundDashTimer = 0; player.airDashUsed = false; player.knockbackTimer = 0;
   cameraX = 0;
   cameraY = 0;
+  hitFreezeTimer = 0;
+  screenShakeTimer = 0;
   // reset enemies
   for (const e of enemies) {
     e.x = e.startX;
@@ -204,12 +206,16 @@ function updatePlayer() {
         flipRedEnemy(e);
         player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -S.redBounceBack : S.redBounceBack;
         player.knockbackTimer = 12;
+        hitFreezeTimer = HIT_FREEZE_FRAMES;
+        screenShakeTimer = SCREEN_SHAKE_FRAMES;
       } else if (e.stunTimer > 0) {
         hurtPlayer();
       } else {
         player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
         player.vy = -4;
         hitEnemy(e);
+        hitFreezeTimer = HIT_FREEZE_FRAMES;
+        screenShakeTimer = SCREEN_SHAKE_FRAMES;
       }
     }
   }
@@ -230,12 +236,16 @@ function updatePlayer() {
           flipRedEnemy(e);
           player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -S.redBounceBack : S.redBounceBack;
           player.knockbackTimer = 12;
+        hitFreezeTimer = HIT_FREEZE_FRAMES;
+        screenShakeTimer = SCREEN_SHAKE_FRAMES;
         } else if (e.stunTimer > 0) {
           hurtPlayer();
         } else {
           player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
           player.vy = -4;
           hitEnemy(e);
+          hitFreezeTimer = HIT_FREEZE_FRAMES;
+          screenShakeTimer = SCREEN_SHAKE_FRAMES;
         }
         break;
       }

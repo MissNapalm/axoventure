@@ -5,12 +5,28 @@ canvas.style.height = VIEW_H * SCALE + 'px';
 ctx.imageSmoothingEnabled = false;
 
 function loop() {
-  updatePlayer();
-  updateEnemies();
-  updateRedEnemies();
-  updateLightning();
+  // hit freeze: skip all updates while frozen
+  if (hitFreezeTimer > 0) {
+    hitFreezeTimer--;
+  } else {
+    updatePlayer();
+    updateEnemies();
+    updateRedEnemies();
+    updateLightning();
+  }
 
   ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+
+  // screen shake: translate canvas before all draws
+  let shakeX = 0, shakeY = 0;
+  if (screenShakeTimer > 0) {
+    screenShakeTimer--;
+    shakeX = (Math.random() * 2 - 1) * SCREEN_SHAKE_MAG;
+    shakeY = (Math.random() * 2 - 1) * SCREEN_SHAKE_MAG;
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+  }
+
   drawBg();
   drawLightning();
   drawRain();
@@ -20,6 +36,9 @@ function loop() {
   drawRedEnemies();
   drawPlayer();
   drawCarriedRedEnemies();
+
+  if (screenShakeTimer > 0 || shakeX !== 0 || shakeY !== 0) ctx.restore();
+
   drawDialog();
   drawSettings();
   drawHUD();

@@ -1,5 +1,7 @@
 let cameraX = 0;
 let cameraY = 0;
+let hitFreezeTimer = 0;
+let screenShakeTimer = 0;
 
 const LOWER_Y = 310; // lower ground level after capybaras
 
