@@ -99,42 +99,40 @@ function resolveCollisions() {
 function spawnImpactVFX(x, y) {
   player.impactFlash = 10;
 
-  // wave 1 — fast pixel chunks flying outward (white/yellow)
-  for (let i = 0; i < 24; i++) {
-    const angle = (i / 24) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-    const speed = 5 + Math.random() * 5;
-    const size  = Math.random() < 0.5 ? 3 : 2;
-    player.sparks.push({
-      x, y,
-      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-      life: 10 + Math.floor(Math.random() * 6), maxLife: 16,
-      color: Math.random() < 0.6 ? '#ffffff' : '#ffff80',
-      size, kind: 'box', gravity: 0.18,
-    });
-  }
-
-  // wave 2 — slower cyan debris
-  for (let i = 0; i < 16; i++) {
-    const angle = (i / 16) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
-    const speed = 2 + Math.random() * 3;
+  // wave 1 — dense fast white chunks
+  for (let i = 0; i < 40; i++) {
+    const angle = (i / 40) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+    const speed = 5 + Math.random() * 7;
     player.sparks.push({
       x, y,
       vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 1,
-      life: 14 + Math.floor(Math.random() * 8), maxLife: 22,
-      color: Math.random() < 0.5 ? '#80e0ff' : '#c0ffff',
-      size: 2, kind: 'box', gravity: 0.1,
+      life: 10 + Math.floor(Math.random() * 8), maxLife: 18,
+      color: '#ffffff',
+      size: Math.random() < 0.5 ? 4 : 2, kind: 'box', gravity: 0.18,
     });
   }
 
-  // wave 3 — thin fast streaks (classic 16-bit star burst)
-  for (let i = 0; i < 12; i++) {
-    const angle = (i / 12) * Math.PI * 2;
-    const speed = 7 + Math.random() * 4;
+  // wave 2 — medium white cloud
+  for (let i = 0; i < 24; i++) {
+    const angle = (i / 24) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+    const speed = 2 + Math.random() * 4;
+    player.sparks.push({
+      x, y,
+      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed - 0.5,
+      life: 14 + Math.floor(Math.random() * 10), maxLife: 24,
+      color: '#ffffff', size: 3, kind: 'box', gravity: 0.08,
+    });
+  }
+
+  // wave 3 — long white streaks radiating outward
+  for (let i = 0; i < 16; i++) {
+    const angle = (i / 16) * Math.PI * 2;
+    const speed = 8 + Math.random() * 5;
     player.sparks.push({
       x, y,
       vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-      life: 7 + Math.floor(Math.random() * 4), maxLife: 11,
-      color: '#ffffff', size: 1.5, kind: 'line', gravity: 0,
+      life: 8 + Math.floor(Math.random() * 4), maxLife: 12,
+      color: '#ffffff', size: 2, kind: 'line', gravity: 0,
     });
   }
 }

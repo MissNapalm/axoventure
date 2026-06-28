@@ -320,35 +320,49 @@ function spawnDeathStars(e) {
   const cx = e.x + e.w / 2;
   const cy = (e._y ? e._y : e.y) + e.h / 2;
 
-  // dense fast white burst
-  for (let i = 0; i < 40; i++) {
-    const angle = (i / 40) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
-    const speed = 3 + Math.random() * 7;
+  // wave 1 — massive fast white burst
+  for (let i = 0; i < 60; i++) {
+    const angle = (i / 60) * Math.PI * 2 + (Math.random() - 0.5) * 0.35;
+    const speed = 4 + Math.random() * 9;
     e.particles.push({
       x: cx, y: cy,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 2,
-      life: 10 + Math.floor(Math.random() * 12),
-      maxLife: 22,
-      size: Math.random() < 0.5 ? 4 : 2,
+      life: 10 + Math.floor(Math.random() * 14),
+      maxLife: 24,
+      size: Math.random() < 0.4 ? 5 : Math.random() < 0.7 ? 3 : 2,
       color: '#ffffff',
       gravity: 0.22,
     });
   }
 
-  // secondary looser white cloud
-  for (let i = 0; i < 20; i++) {
+  // wave 2 — slower lingering white cloud
+  for (let i = 0; i < 30; i++) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 1 + Math.random() * 4;
     e.particles.push({
       x: cx, y: cy,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 0.5,
-      life: 16 + Math.floor(Math.random() * 12),
-      maxLife: 28,
-      size: 2,
+      life: 18 + Math.floor(Math.random() * 14),
+      maxLife: 32,
+      size: 3,
       color: '#ffffff',
-      gravity: 0.08,
+      gravity: 0.06,
+    });
+  }
+
+  // wave 3 — long white streaks
+  for (let i = 0; i < 16; i++) {
+    const angle = (i / 16) * Math.PI * 2;
+    const speed = 9 + Math.random() * 5;
+    e.particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 8 + Math.floor(Math.random() * 4),
+      maxLife: 12,
+      size: 2, color: '#ffffff', gravity: 0, kind: 'line',
     });
   }
 }
@@ -436,6 +450,14 @@ function drawParticles(particles) {
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(sx, sy, p.r, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (p.kind === 'line') {
+      ctx.strokeStyle = p.color || '#ffffff';
+      ctx.lineWidth = p.size || 1.5;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      p.x += p.vx; p.y += p.vy;
+      ctx.lineTo(Math.round(p.x - cameraX), Math.round(p.y - cameraY));
       ctx.stroke();
     } else {
       ctx.fillStyle = p.color || '#ffffff';
