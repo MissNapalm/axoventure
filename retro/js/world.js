@@ -103,13 +103,63 @@ function drawRain() {
 
 function drawPlatforms() {
   for (const p of platforms) {
-    const sx = p.x - cameraX;
-    const sy = p.y - cameraY;
-    ctx.fillStyle = '#7a5544'; ctx.fillRect(sx, sy, p.w, 3);
-    ctx.fillStyle = p.color;  ctx.fillRect(sx, sy + 3, p.w, p.h - 3);
-    if (p.h <= 10) {
+    const sx = Math.round(p.x - cameraX);
+    const sy = Math.round(p.y - cameraY);
+
+    if (p.oneWay) {
+      // small floating platform — simple brown plank with grass tuft
+      ctx.fillStyle = '#7a5544'; ctx.fillRect(sx, sy, p.w, 3);
+      ctx.fillStyle = p.color;  ctx.fillRect(sx, sy + 3, p.w, p.h - 3);
       ctx.fillStyle = '#5c8a3c';
       for (let gx = sx + 4; gx < sx + p.w - 4; gx += 8) ctx.fillRect(gx, sy, 2, 3);
+    } else {
+      // tall ground slab — layered like a real cross-section
+      const totalH = p.h;
+
+      // grass top (3px)
+      ctx.fillStyle = '#4a9e30';
+      ctx.fillRect(sx, sy, p.w, 3);
+
+      // bright grass detail (1px highlights every few pixels)
+      ctx.fillStyle = '#6dc442';
+      for (let gx = sx + 2; gx < sx + p.w; gx += 6) ctx.fillRect(gx, sy, 2, 2);
+
+      // topsoil (next 10px, warm brown)
+      ctx.fillStyle = '#7a4f2a';
+      ctx.fillRect(sx, sy + 3, p.w, 10);
+
+      // dirt layer 1 (darker, 20px)
+      ctx.fillStyle = '#5c3a1e';
+      ctx.fillRect(sx, sy + 13, p.w, 20);
+
+      // dirt layer 2 (darker still, 30px)
+      ctx.fillStyle = '#3d2410';
+      ctx.fillRect(sx, sy + 33, p.w, 30);
+
+      // transition to wet dirt (20px, slight blue tint)
+      ctx.fillStyle = '#2e2218';
+      ctx.fillRect(sx, sy + 63, p.w, 20);
+
+      // waterlogged / underground water layer (rest)
+      if (totalH > 83) {
+        ctx.fillStyle = '#1a2a3a';
+        ctx.fillRect(sx, sy + 83, p.w, totalH - 83);
+        // water shimmer lines
+        ctx.fillStyle = '#1e3d5a';
+        for (let wy = sy + 90; wy < sy + totalH; wy += 12) {
+          for (let wx = sx + 3; wx < sx + p.w - 3; wx += 18) {
+            ctx.fillRect(wx, wy, 8, 1);
+          }
+        }
+      }
+
+      // stone pebble details scattered in dirt
+      ctx.fillStyle = '#4a3828';
+      for (let dx = 10; dx < p.w - 10; dx += 23) {
+        ctx.fillRect(sx + dx,      sy + 16, 3, 2);
+        ctx.fillRect(sx + dx + 11, sy + 28, 2, 2);
+        ctx.fillRect(sx + dx + 5,  sy + 42, 3, 2);
+      }
     }
   }
 }
