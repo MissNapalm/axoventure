@@ -868,13 +868,23 @@ function drawPlayer() {
       const progress = 1 - kt.timer / 50;
       const alpha = kt.timer / 50;
       const floatY = Math.round(kt.y - cameraY - progress * 18);
+      const kx = Math.round(kt.x - cameraX);
       ctx.save();
-      ctx.font = PIXEL_FONT;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'bottom';
       ctx.globalAlpha = alpha;
+      // combo count above hit text
+      if (combo.count >= 2) {
+        ctx.font = '16px "Press Start 2P"';
+        ctx.fillStyle = combo.count >= 10 ? '#ff4400' : combo.count >= 5 ? '#ffaa00' : '#ffe866';
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = 6;
+        ctx.fillText(`x${combo.count}`, kx, floatY - 12);
+        ctx.shadowBlur = 0;
+      }
+      ctx.font = PIXEL_FONT;
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(kt.text, Math.round(kt.x - cameraX), floatY);
+      ctx.fillText(kt.text, kx, floatY);
       ctx.restore();
     }
   }
