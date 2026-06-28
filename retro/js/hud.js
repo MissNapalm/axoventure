@@ -42,6 +42,48 @@ function drawHUD() {
     ctx.fillRect(Math.max(METER_X, shimX), METER_Y, 2, METER_H);
   }
 
+  // kill combo counter
+  if (combo.count >= 2 || combo.displayTimer > 0) {
+    const isExpiring = combo.displayTimer > 0;
+    const alpha = isExpiring ? Math.min(1, combo.displayTimer / 30) : 1;
+    const pulse = !isExpiring && Math.floor(Date.now() / 150) % 2 === 0 ? 1.1 : 1;
+    const cx = VIEW_W - 6;
+    const cy = 6;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'right';
+
+    // combo count
+    ctx.font = '16px "Press Start 2P"';
+    ctx.fillStyle = combo.count >= 10 ? '#ff4400' : combo.count >= 5 ? '#ffaa00' : '#ffffff';
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = pulse > 1 ? 8 : 0;
+    ctx.fillText(`x${combo.count}`, cx, cy + 14);
+    ctx.shadowBlur = 0;
+
+    // label
+    ctx.font = PIXEL_FONT_SM;
+    ctx.fillStyle = '#b07aff';
+    ctx.fillText('COMBO', cx, cy + 23);
+
+    // timer bar below — shows how long until combo expires
+    if (!isExpiring) {
+      const barW = 40;
+      const barH = 2;
+      const barX = cx - barW;
+      const barY = cy + 26;
+      const frac = combo.timer / combo.WINDOW;
+      ctx.fillStyle = '#1a0a2e';
+      ctx.fillRect(barX, barY, barW, barH);
+      ctx.fillStyle = frac > 0.5 ? '#00ff88' : frac > 0.25 ? '#ffaa00' : '#ff4400';
+      ctx.fillRect(barX, barY, Math.round(barW * frac), barH);
+    }
+
+    ctx.textAlign = 'left';
+    ctx.restore();
+  }
+
   // coder mode indicator
   if (coderMode) {
     ctx.font = PIXEL_FONT_SM;

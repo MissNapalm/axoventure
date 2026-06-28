@@ -79,6 +79,7 @@ function loop() {
     updateRedEnemies();
     updateFish();
     updateBigFish();
+    updateCombo();
     updateLightning();
     updateItems();
   }

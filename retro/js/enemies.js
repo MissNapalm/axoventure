@@ -528,6 +528,37 @@ function drawFish() {
   }
 }
 
+// ── Kill combo ────────────────────────────────────────────────────────────────
+const combo = {
+  count: 0,
+  timer: 0,
+  WINDOW: 180, // frames to keep combo alive after a kill
+  displayTimer: 0, // how long to show the final count after it expires
+  peak: 0,
+};
+
+function registerKill() {
+  combo.count++;
+  combo.timer = combo.WINDOW;
+  combo.displayTimer = 0;
+  if (combo.count > combo.peak) combo.peak = combo.count;
+}
+
+function updateCombo() {
+  if (combo.timer > 0) {
+    combo.timer--;
+    if (combo.timer === 0 && combo.count > 1) {
+      combo.displayTimer = 120; // show final count for 2 seconds
+    } else if (combo.timer === 0) {
+      combo.count = 0;
+    }
+  }
+  if (combo.displayTimer > 0) {
+    combo.displayTimer--;
+    if (combo.displayTimer === 0) combo.count = 0;
+  }
+}
+
 function hitFish(e) {
   e.hp--;
   e.hitFlash = HIT_FLASH_FRAMES;
@@ -538,6 +569,7 @@ function hitFish(e) {
     triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
     screenShakeTimer = 6;
     if (player.dashing || player.groundDashing) player.killSpin = 10;
+    registerKill();
   }
 }
 
@@ -553,6 +585,7 @@ function hitFishByHoming(e, impactX, impactY) {
   hitFreezeTimer = HIT_FREEZE_FRAMES;
   spawnImpactVFX(impactX, impactY);
   player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
+  registerKill();
 }
 
 function hitFishByDash(e, ex, ey) {
@@ -565,6 +598,7 @@ function hitFishByDash(e, ex, ey) {
   hitFreezeTimer = HIT_FREEZE_FRAMES;
   spawnImpactVFX(ex, ey);
   player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
+  registerKill();
 }
 
 // ── Big Fish enemies ──────────────────────────────────────────────────────────
