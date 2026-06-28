@@ -5,6 +5,53 @@ canvas.style.height = VIEW_H * SCALE + 'px';
 ctx.imageSmoothingEnabled = false;
 
 function loop() {
+  if (death.active) {
+    death.timer++;
+    if (death.timer < death.freezeEnd) {
+      // frozen pause before pop — do nothing
+    } else {
+      // pop up then fall
+      if (death.timer === death.freezeEnd) death.vy = death.popVy;
+      death.vy += 0.35;
+      death.y  += death.vy;
+    }
+    // after falling off screen, reset
+    if (death.timer > death.freezeEnd && death.y - cameraY > VIEW_H + 40) {
+      death.active = false;
+      resetLevel();
+    }
+
+    ctx.clearRect(0, 0, VIEW_W, VIEW_H);
+    drawBg(); drawRain(); drawWater(); drawPlatforms();
+
+    // draw axo frozen/dead — use walk1, no flicker, centred where he died
+    if (assetsReady()) {
+      const spr = sprites['walk1'];
+      const sx = Math.round(death.x - cameraX);
+      const sy = Math.round(death.y - cameraY);
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      // white tint like a death flash
+      const oc = document.createElement('canvas');
+      oc.width = spr.naturalWidth; oc.height = spr.naturalHeight;
+      const oc2d = oc.getContext('2d');
+      oc2d.imageSmoothingEnabled = false;
+      oc2d.drawImage(spr, 0, 0);
+      if (death.timer < death.freezeEnd) {
+        // flash white during freeze
+        oc2d.globalCompositeOperation = 'source-atop';
+        oc2d.fillStyle = `rgba(255,255,255,${0.8 - (death.timer / death.freezeEnd) * 0.8})`;
+        oc2d.fillRect(0, 0, oc.width, oc.height);
+      }
+      ctx.drawImage(oc, sx, sy);
+      ctx.restore();
+    }
+
+    drawHUD();
+    requestAnimationFrame(loop);
+    return;
+  }
+
   // hit freeze: skip all updates while frozen
   if (hitFreezeTimer > 0) {
     hitFreezeTimer--;

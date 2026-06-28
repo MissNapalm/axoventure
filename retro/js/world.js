@@ -3,6 +3,17 @@ let cameraY = 0;
 let hitFreezeTimer = 0;
 let screenShakeTimer = 0;
 
+// Mario-style death sequence
+const death = {
+  active: false,
+  timer: 0,       // counts up
+  freezeEnd: 40,  // frames frozen before pop
+  popVy: -8,      // initial upward velocity
+  vy: 0,
+  y: 0,           // player y during death fall
+  x: 0,
+};
+
 // Water zone: player swims freely inside this rectangle
 const WATER_ZONE = { x: 1700, y: 230, w: 2500, h: 600 };
 // The seafloor/rock shelf that closes the bottom

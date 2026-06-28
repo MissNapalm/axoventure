@@ -30,6 +30,7 @@ function makeEnemy(x, patrolLeft, patrolRight, platformY) {
     frame: 0, frameTimer: 0,
     dead: false,
     respawnTimer: 0,
+    lastHitBy: null,
     particles: [],
   };
 }
@@ -549,7 +550,7 @@ function hitFishByDash(e, ex, ey) {
 const BIG_FISH_W = 28;
 const BIG_FISH_H = 15;
 const WINDUP_FRAMES  = 90;  // stun/telegraph duration
-const RUSH_SPEED     = 9;
+const RUSH_SPEED     = 10;
 const RUSH_FRAMES    = 22;
 const COOLDOWN_FRAMES = 60;
 const PATROL_TRIGGER_DIST = 130; // how close player must be to trigger windup
@@ -570,6 +571,7 @@ function makeBigFish(x, y, swimLeft, swimRight) {
     dead: false,
     deathFlash: 0,
     hitFlash: 0,
+    proximityTimer: 0,
     particles: [],
   };
 }
@@ -593,7 +595,7 @@ function updateBigFish() {
       if (Math.abs(e.startX - (player.x + player.w / 2)) > VIEW_W) {
         e.x = e.startX; e.y = e.startY;
         e.vx = 0.5; e.vy = 0;
-        e.hp = 3; e.dead = false; e.deathFlash = 0; e.hitFlash = 0;
+        e.hp = 3; e.dead = false; e.deathFlash = 0; e.hitFlash = 0; e.proximityTimer = 0;
         e.state = 'patrol'; e.stateTimer = 0; e.particles = [];
         e.bobPhase = Math.random() * Math.PI * 2;
       }
@@ -613,6 +615,18 @@ function updateBigFish() {
       if (e.x <= e.swimLeft)           { e.x = e.swimLeft;         e.vx =  Math.abs(e.vx); }
       if (e.x + e.w >= e.swimRight)    { e.x = e.swimRight - e.w;  e.vx = -Math.abs(e.vx); }
 
+      // aggro if player stays close for 3 seconds (180 frames)
+      if (player.inWater && dist < PATROL_TRIGGER_DIST) {
+        e.proximityTimer++;
+        if (e.proximityTimer >= 180) {
+          e.proximityTimer = 0;
+          e.state = 'windup';
+          e.stateTimer = WINDUP_FRAMES;
+          e.vx = 0;
+        }
+      } else {
+        e.proximityTimer = 0;
+      }
 
     } else if (e.state === 'windup') {
       // hold position, shake slightly, face player
@@ -698,16 +712,20 @@ function drawBigFish() {
 
     const sx = Math.round(e.x - cameraX);
     const sy = Math.round(e.y - cameraY);
-    const facingRight = e.vx >= 0;
+    const facingRight = e.state === 'rush' ? e.rushVx >= 0 : e.vx >= 0;
     const W = e.w, H = e.h;
 
     const isWindup  = e.state === 'windup';
     const isRush    = e.state === 'rush';
     const flash = e.deathFlash > 0;
 
+    // rush angle: rotate sprite so nose points at target
+    const rushAngle = isRush ? Math.atan2(e.rushVy, Math.abs(e.rushVx)) * (facingRight ? 1 : -1) : 0;
+
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     ctx.translate(sx + W / 2, sy + H / 2);
+    ctx.rotate(rushAngle);
     if (!facingRight) ctx.scale(-1, 1);
 
     // rush: motion lines behind fish

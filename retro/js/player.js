@@ -63,7 +63,7 @@ function resetLevel() {
   for (const e of bigFishEnemies) {
     e.x = e.startX; e.y = e.startY;
     e.vx = 0.5; e.vy = 0;
-    e.hp = 3; e.dead = false; e.deathFlash = 0; e.hitFlash = 0;
+    e.hp = 3; e.dead = false; e.deathFlash = 0; e.hitFlash = 0; e.proximityTimer = 0;
     e.state = 'patrol'; e.stateTimer = 0; e.particles = [];
     e.bobPhase = Math.random() * Math.PI * 2;
   }
@@ -94,7 +94,19 @@ function hurtPlayer() {
   player.hp--;
   player.hurtTimer = HURT_FRAMES;
   player.dashing = false; player.dashTarget = null;
-  if (player.hp <= 0) resetLevel();
+  if (player.hp <= 0) startDeathSequence();
+}
+
+function startDeathSequence() {
+  death.active = true;
+  death.timer = 0;
+  death.vy = 0;
+  death.y = player.y;
+  death.x = player.x;
+  player.vx = 0; player.vy = 0;
+  player.dashing = false; player.dashTarget = null;
+  player.groundDashing = false;
+  hitFreezeTimer = 0;
 }
 
 const WALK_SEQ = ['walk1', 'walk2', 'walk3', 'walk4'];
@@ -398,16 +410,15 @@ function updatePlayer() {
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         spawnImpactVFX(impactX, impactY);
         player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
-      } else if (e.stunTimer > 0) {
-        hurtPlayer();
       } else {
         player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
         player.vy = -4;
+        const wasLastDash = e.lastHitBy === 'dash';
         hitEnemy(e);
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         screenShakeTimer = SCREEN_SHAKE_FRAMES;
         spawnImpactVFX(impactX, impactY);
-        if (e.dead) player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
+        if (e.dead) player.killText = { text: wasLastDash ? 'ONE-TWO HIT!' : 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
       }
     }
   }
@@ -436,17 +447,16 @@ function updatePlayer() {
           player.knockbackTimer = 12;
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         screenShakeTimer = SCREEN_SHAKE_FRAMES;
-        } else if (e.stunTimer > 0) {
-          hurtPlayer();
         } else {
           player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
           player.vy = -4;
           const ex = e.x + e.w / 2, ey = (e._y ? e._y : e.y) + e.h / 2;
+          e.lastHitBy = 'dash';
           hitEnemy(e);
           hitFreezeTimer = HIT_FREEZE_FRAMES;
           screenShakeTimer = SCREEN_SHAKE_FRAMES;
           spawnImpactVFX(ex, ey);
-          if (e.dead) player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
+          player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
         }
         break;
       }
