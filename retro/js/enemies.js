@@ -124,10 +124,8 @@ function updateRedEnemies() {
   for (const e of redEnemies) {
     if (e.hitFlash > 0) e.hitFlash--;
 
-    // particles
-    for (const p of e.particles) {
-      p.x += p.vx; p.y += p.vy; p.vy += 0.12; p.life--;
-    }
+    // particles — life only; physics handled in draw
+    for (const p of e.particles) p.life--;
     e.particles = e.particles.filter(p => p.life > 0);
 
     if (e.dead) {
@@ -306,17 +304,7 @@ function drawRedEnemy(e) {
 function drawRedEnemies() {
   getRedSprites();
   for (const e of redEnemies) {
-    // particles always drawn first
-    for (const p of e.particles) {
-      const alpha = p.life / 40;
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = '#ff4444';
-      const sx = Math.round(p.x - cameraX), sy = Math.round(p.y - cameraY), s = p.size || 2;
-      ctx.fillRect(sx - s, sy, s * 2 + 1, 1);
-      ctx.fillRect(sx, sy - s, 1, s * 2 + 1);
-      ctx.restore();
-    }
+    drawParticles(e.particles);
     if (!e.carried) drawRedEnemy(e);
   }
 }
@@ -328,17 +316,41 @@ function drawCarriedRedEnemies() {
 }
 
 function spawnDeathStars(e) {
-  for (let i = 0; i < 16; i++) {
-    const angle = (i / 16) * Math.PI * 2;
-    const speed = Math.random() * 2 + 1;
+  const cx = e.x + e.w / 2;
+  const cy = (e._y ? e._y : e.y) + e.h / 2;
+
+  // expanding white circle
+  e.particles.push({ kind: 'circle', x: cx, y: cy, r: 2, life: 18, maxLife: 18, speed: 8 });
+
+  // fast white/yellow pixel chunks
+  for (let i = 0; i < 28; i++) {
+    const angle = (i / 28) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+    const speed = 3 + Math.random() * 6;
     e.particles.push({
-      x: e.x + e.w / 2,
-      y: e.y + e.h / 2,
+      x: cx, y: cy,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed - 1,
-      life: 40,
-      maxLife: 40,
+      vy: Math.sin(angle) * speed - 1.5,
+      life: 12 + Math.floor(Math.random() * 10),
+      maxLife: 22,
       size: Math.random() < 0.5 ? 3 : 2,
+      color: Math.random() < 0.6 ? '#ffffff' : '#ffff88',
+      gravity: 0.2,
+    });
+  }
+
+  // slower cyan debris
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+    const speed = 1.5 + Math.random() * 3;
+    e.particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 0.5,
+      life: 18 + Math.floor(Math.random() * 10),
+      maxLife: 28,
+      size: 2,
+      color: '#80e0ff',
+      gravity: 0.1,
     });
   }
 }
@@ -359,13 +371,8 @@ function hitEnemy(e) {
 
 function updateEnemies() {
   for (const e of enemies) {
-    // update particles even when dead
-    for (const p of e.particles) {
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.12;
-      p.life--;
-    }
+    // particles — life only; physics handled in draw
+    for (const p of e.particles) p.life--;
     e.particles = e.particles.filter(p => p.life > 0);
 
     if (e.hitTextTimer > 0) e.hitTextTimer--;
@@ -415,22 +422,35 @@ function updateEnemies() {
   }
 }
 
+function drawParticles(particles) {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    const alpha = p.life / p.maxLife;
+    const sx = Math.round(p.x - cameraX);
+    const sy = Math.round(p.y - cameraY);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (p.kind === 'circle') {
+      p.r += p.speed;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sx, sy, p.r, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = p.color || '#ffffff';
+      const s = p.size || 2;
+      ctx.fillRect(sx - (s / 2 | 0), sy - (s / 2 | 0), s, s);
+      if (p.gravity) p.vy += p.gravity;
+      p.x += p.vx; p.y += p.vy;
+    }
+    ctx.restore();
+  }
+}
+
 function drawEnemies() {
   for (const e of enemies) {
-    // draw death star particles
-    for (const p of e.particles) {
-      const alpha = p.life / p.maxLife;
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = '#ffffff';
-      const sx = Math.round(p.x - cameraX);
-      const sy = Math.round(p.y - cameraY);
-      const s = p.size;
-      // pixel star: cross shape
-      ctx.fillRect(sx - s, sy,     s * 2 + 1, 1);
-      ctx.fillRect(sx,     sy - s, 1,          s * 2 + 1);
-      ctx.restore();
-    }
+    drawParticles(e.particles);
 
     if (e.dead || e.w === 0) continue;
     const sx = Math.round(e.x - cameraX);
