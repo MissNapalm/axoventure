@@ -39,6 +39,7 @@ const player = {
   postDashTimer: 0,
   swimBobPhase: 0,
   waterExitSpin: 0,   // spin angle when launched out of water by dash
+  dashedFromWater: false,
   splash: [],         // splash particles
 };
 
@@ -60,6 +61,7 @@ function resetLevel() {
   player.inWater = false;
   player.wasInWater = false;
   player.waterExitSpin = 0;
+  player.dashedFromWater = false;
   player.splash = [];
   player.bubbles = [];
   player.bubbleTimer = 0;
@@ -231,10 +233,8 @@ function updatePlayer() {
           player.vy = ny * GROUND_DASH_SPEED;
           player.facingLeft = nx < 0;
           if (!player.onGround && !player.inWater) player.airDashUsed = true;
-          // launching out of water with upward component → start spin
-          if (player.wasInWater && !player.inWater && player.vy < 0) {
-            player.waterExitSpin = 1; // active spin flag
-          }
+          // flag that this dash started in water — spin triggers on water exit
+          if (player.inWater) player.dashedFromWater = true;
         }
       }
     }
@@ -277,27 +277,56 @@ function updatePlayer() {
 
   // water transition — spawn splash
   if (player.inWater !== player.wasInWater) {
-    const sx = pcx, sy = player.y + (player.inWater ? 0 : player.h);
-    for (let i = 0; i < 18; i++) {
-      const angle = -Math.PI + (Math.random() * Math.PI); // upward arc
-      const speed = 1.5 + Math.random() * 4;
+    const sx = pcx;
+    const sy = player.inWater ? player.y : (player.y + player.h * 0.5);
+    const entrySpeed = Math.max(1, Math.hypot(player.vx, player.vy));
+    const intensity = Math.min(entrySpeed / 3, 3);
+
+    // big upward jets
+    for (let i = 0; i < 30; i++) {
+      const speed = (5 + Math.random() * 9) * (0.8 + intensity * 0.4);
       player.splash.push({
-        x: sx + (Math.random() - 0.5) * player.w,
+        x: sx + (Math.random() - 0.5) * player.w * 2,
         y: sy,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 2,
-        life: 14 + Math.floor(Math.random() * 12),
-        maxLife: 26,
-        size: Math.random() < 0.5 ? 2 : 1,
-        gravity: 0.18,
+        vx: (Math.random() - 0.5) * speed * 0.9,
+        vy: -(speed * 0.75 + Math.random() * 4),
+        life: 22 + Math.floor(Math.random() * 20),
+        maxLife: 42,
+        size: Math.random() < 0.35 ? 3 : Math.random() < 0.65 ? 2 : 1,
+        gravity: 0.20,
       });
     }
-    // stop spin on water entry
-    if (player.inWater) player.waterExitSpin = 0;
+    // wide horizontal spray
+    for (let i = 0; i < 20; i++) {
+      const dir = i < 10 ? -1 : 1;
+      const speed = 3 + Math.random() * 6;
+      player.splash.push({
+        x: sx,
+        y: sy,
+        vx: dir * speed * (1 + Math.random()),
+        vy: -(0.5 + Math.random() * 2.5),
+        life: 10 + Math.floor(Math.random() * 12),
+        maxLife: 22,
+        size: 1,
+        gravity: 0.30,
+      });
+    }
+
+    if (player.inWater) {
+      // entered water — stop spin, clear flag
+      player.waterExitSpin = 0;
+      player.dashedFromWater = false;
+    } else {
+      // exited water — spin if dashed or launched upward fast
+      if (player.dashedFromWater || player.vy < -3) {
+        player.waterExitSpin = 0.01;
+      }
+      player.dashedFromWater = false;
+    }
   }
 
   // stop spin on landing
-  if (player.onGround) player.waterExitSpin = 0;
+  if (player.onGround) { player.waterExitSpin = 0; player.dashedFromWater = false; }
 
   // bubble spawning from axo's mouth
   for (let i = player.bubbles.length - 1; i >= 0; i--) {
@@ -432,7 +461,7 @@ function updatePlayer() {
     player.trail.push({ x: player.x + player.w / 2, y: player.y + player.h / 2, life: 18 });
   }
   // advance water exit spin
-  if (player.waterExitSpin > 0) player.waterExitSpin += 0.28; // ~1.75 rad/frame ≈ fast spin
+  if (player.waterExitSpin > 0) player.waterExitSpin += 0.42; // ~1 rotation per 15 frames
 
   // update splash particles
   for (const p of player.splash) {
@@ -708,10 +737,17 @@ function drawPlayer() {
     for (const p of player.splash) {
       const alpha = p.life / p.maxLife;
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = alpha > 0.5 ? '#a8d8f0' : '#ffffff';
       const sx2 = Math.round(p.x - cameraX);
       const sy2 = Math.round(p.y - cameraY);
+      // outer droplet
+      ctx.fillStyle = '#5bc8f0';
       ctx.fillRect(sx2, sy2, p.size, p.size);
+      // bright core on larger drops
+      if (p.size >= 2 && alpha > 0.4) {
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.fillStyle = '#e8f8ff';
+        ctx.fillRect(sx2, sy2, 1, 1);
+      }
     }
     ctx.globalAlpha = 1;
     ctx.restore();
