@@ -360,9 +360,10 @@ function updatePlayer() {
   const targetY = Math.max(0, player.y - VIEW_H * 0.65 + player.h / 2);
   cameraY += (targetY - cameraY) * 0.08;
 
-  if (player.moving && player.onGround) {
+  const horizontalDash = player.groundDashing && Math.abs(Math.sin(player.groundDashAngle)) <= 0.3;
+  if (player.moving && player.onGround || horizontalDash) {
     player.frameTimer++;
-    if (player.frameTimer >= S.animSpeed) { player.frameTimer = 0; player.frame = (player.frame + 1) % WALK_SEQ.length; }
+    if (player.frameTimer >= (horizontalDash ? 3 : S.animSpeed)) { player.frameTimer = 0; player.frame = (player.frame + 1) % WALK_SEQ.length; }
   } else {
     player.frame = 0; player.frameTimer = 0;
   }
