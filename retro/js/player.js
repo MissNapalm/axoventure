@@ -655,10 +655,8 @@ function updatePlayer() {
               hitFreezeTimer = HIT_FREEZE_FRAMES;
               screenShakeTimer = SCREEN_SHAKE_FRAMES;
               spawnImpactVFX(ex, ey);
-              if (!e.dead) {
-                player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
-                if (player.postDashTimer === 0) player.postDashTimer = 20;
-              }
+              player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
+              if (!e.dead && player.postDashTimer === 0) player.postDashTimer = 20;
             }
           }
         }
