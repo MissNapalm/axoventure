@@ -4,7 +4,11 @@ canvas.style.width  = VIEW_W * SCALE + 'px';
 canvas.style.height = VIEW_H * SCALE + 'px';
 ctx.imageSmoothingEnabled = false;
 
+// shared frame timestamp — use instead of Date.now() in draw/update functions
+let frameNow = 0;
+
 function loop() {
+  frameNow = performance.now();
   if (levelComplete) {
     updateItems(); // keeps timer ticking
     ctx.clearRect(0, 0, VIEW_W, VIEW_H);
@@ -80,6 +84,7 @@ function loop() {
     updateFish();
     updateBigFish();
     updateCombo();
+    updateFury();
     updateLightning();
     updateItems();
   }

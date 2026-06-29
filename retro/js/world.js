@@ -29,6 +29,8 @@ const WATER_FLOOR_Y_2 = WATER_ZONE_2.y + WATER_ZONE_2.h;
 const platforms = [
   // upper ground (original section)
   { x: -200, y: 210, w: 1900, h: 400, color: '#3d2b1f' },
+  // fill the 20px notch where land meets water zone wall
+  { x: 1700, y: 210, w: 40, h: 20, color: '#3d2b1f' },
   // floating platforms (original)
   { x: 80,   y: 175, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
   { x: 230,  y: 155, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
@@ -98,6 +100,8 @@ const raindrops = Array.from({ length: 60 }, () => ({
 }));
 
 let _waterOC = null;
+let _waterFxOC = null;
+let _waterFxFrame = -1;
 function drawWater() {
   const wx = Math.round(WATER_ZONE.x - cameraX);
   const wy = Math.round(WATER_ZONE.y - cameraY);
@@ -115,50 +119,49 @@ function drawWater() {
   }
   ctx.drawImage(_waterOC, wx, wy);
 
-  // surface shimmer lines
-  const t = Date.now() * 0.001;
-  ctx.save();
-  ctx.globalAlpha = 0.35;
-  ctx.strokeStyle = '#7ec8e3';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 6; i++) {
-    const phase = (t * 0.6 + i * 1.1) % 1;
-    const lineY = wy + phase * 14;
-    const lineX = wx + (i * 43) % ww;
-    ctx.beginPath();
-    ctx.moveTo(lineX, lineY);
-    ctx.lineTo(lineX + 22 + Math.sin(t + i) * 6, lineY);
-    ctx.stroke();
-  }
-  ctx.restore();
+  // animated fx — redrawn only every 3 frames into offscreen canvas
+  const fxTick = Math.floor(frameNow / 50); // ~20fps for decorations
+  if (fxTick !== _waterFxFrame) {
+    _waterFxFrame = fxTick;
+    if (!_waterFxOC) _waterFxOC = getOC('water_fx', VIEW_W, wh);
+    const fc = _waterFxOC._ctx;
+    fc.clearRect(0, 0, VIEW_W, wh);
+    const t = frameNow * 0.001;
 
-  // bubbles drifting upward
-  ctx.save();
-  ctx.globalAlpha = 0.22;
-  ctx.fillStyle = '#a0e0ff';
-  const bSeed = Math.floor(t * 0.5);
-  for (let i = 0; i < 14; i++) {
-    const bx = wx + ((i * 179 + bSeed * 37) % ww);
-    const by = wy + wh - ((t * 20 + i * 47) % wh);
-    const br = 1 + (i % 3);
-    ctx.beginPath();
-    ctx.arc(bx, by, br, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
+    // shimmer lines — use fillRect not stroke
+    fc.globalAlpha = 0.35;
+    fc.fillStyle = '#7ec8e3';
+    for (let i = 0; i < 6; i++) {
+      const phase = (t * 0.6 + i * 1.1) % 1;
+      const lineY = Math.round(phase * 14);
+      const lineX = (i * 43) % VIEW_W;
+      const lineW = Math.round(22 + Math.sin(t + i) * 6);
+      fc.fillRect(lineX, lineY, lineW, 1);
+    }
 
-  // caustic light patches on the surface band
-  ctx.save();
-  ctx.globalAlpha = 0.10;
-  ctx.fillStyle = '#c0f0ff';
-  for (let i = 0; i < 8; i++) {
-    const cx2 = wx + (i * 311 + Math.floor(t * 30) * 7) % ww;
-    const cy2 = wy + 4 + (Math.sin(t * 1.2 + i) * 0.5 + 0.5) * 20;
-    ctx.beginPath();
-    ctx.ellipse(cx2, cy2, 10 + Math.sin(t + i) * 4, 3, 0, 0, Math.PI * 2);
-    ctx.fill();
+    // bubbles — fillRect instead of arc
+    fc.globalAlpha = 0.22;
+    fc.fillStyle = '#a0e0ff';
+    const bSeed = Math.floor(t * 0.5);
+    for (let i = 0; i < 14; i++) {
+      const bx = (i * 179 + bSeed * 37) % VIEW_W;
+      const by = wh - ((t * 20 + i * 47) % wh);
+      const br = 1 + (i % 3);
+      fc.fillRect(Math.round(bx), Math.round(by), br, br);
+    }
+
+    // caustics — fillRect instead of ellipse
+    fc.globalAlpha = 0.10;
+    fc.fillStyle = '#c0f0ff';
+    for (let i = 0; i < 8; i++) {
+      const cx2 = (i * 311 + Math.floor(t * 30) * 7) % VIEW_W;
+      const cy2 = Math.round(4 + (Math.sin(t * 1.2 + i) * 0.5 + 0.5) * 20);
+      const cw = Math.round(10 + Math.sin(t + i) * 4);
+      fc.fillRect(Math.round(cx2), cy2, cw * 2, 3);
+    }
+    fc.globalAlpha = 1;
   }
-  ctx.restore();
+  if (_waterFxOC) ctx.drawImage(_waterFxOC, 0, wy);
 }
 
 let _water2OC = null;
@@ -179,7 +182,7 @@ function drawWater2() {
   }
   ctx.drawImage(_water2OC, wx, wy);
 
-  const t = Date.now() * 0.001;
+  const t = frameNow * 0.001;
   ctx.save();
   ctx.globalAlpha = 0.30;
   ctx.strokeStyle = '#7ec8e3';
@@ -191,8 +194,25 @@ function drawWater2() {
   ctx.restore();
 }
 
+let _cloudOCs = null;
 let _bgOC = null;
+let _starFrame = -1;
+let _starOC = null;
 function drawBg() {
+  if (!_cloudOCs) {
+    _cloudOCs = clouds.map((c, idx) => {
+      const cw = Math.ceil(c.w * 2 + 4), ch = 28;
+      const oc = getOC('cloud_' + idx, cw, ch);
+      const fc = oc._ctx;
+      fc.fillStyle = '#2d1060';
+      const cx = cw / 2;
+      fc.beginPath(); fc.ellipse(cx, 10, c.w, 10, 0, 0, Math.PI * 2); fc.fill();
+      fc.beginPath(); fc.ellipse(cx - c.w * 0.3, 14, c.w * 0.6, 8, 0, 0, Math.PI * 2); fc.fill();
+      fc.beginPath(); fc.ellipse(cx + c.w * 0.3, 14, c.w * 0.5, 7, 0, 0, Math.PI * 2); fc.fill();
+      oc._cw = cw; oc._ch = ch;
+      return oc;
+    });
+  }
   if (!_bgOC) {
     _bgOC = getOC('bg_grad', VIEW_W, VIEW_H);
     const g = _bgOC._ctx.createLinearGradient(0, 0, 0, VIEW_H);
@@ -203,27 +223,30 @@ function drawBg() {
   }
   ctx.drawImage(_bgOC, 0, 0);
 
-  const t = Date.now() * 0.001;
-  // stars: use fillRect for 1px stars, arc only for larger
-  for (const s of stars) {
-    const sx = ((s.x - cameraX * s.speed) % WORLD_W + WORLD_W) % WORLD_W;
-    ctx.globalAlpha = 0.7 + Math.sin(t + s.x) * 0.3;
-    if (s.r <= 1) {
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(Math.round(sx), s.y, 1, 1);
-    } else {
-      ctx.fillStyle = '#fff';
-      ctx.beginPath(); ctx.arc(sx, s.y, s.r, 0, Math.PI * 2); ctx.fill();
+  // stars — update alpha at ~15fps, bake into offscreen
+  const starTick = Math.floor(frameNow / 66);
+  if (starTick !== _starFrame) {
+    _starFrame = starTick;
+    if (!_starOC) _starOC = getOC('stars_baked', VIEW_W, VIEW_H);
+    const fc = _starOC._ctx;
+    fc.clearRect(0, 0, VIEW_W, VIEW_H);
+    const t = frameNow * 0.001;
+    fc.fillStyle = '#fff';
+    for (const s of stars) {
+      const sx = ((s.x - cameraX * s.speed) % WORLD_W + WORLD_W) % WORLD_W;
+      fc.globalAlpha = 0.7 + Math.sin(t + s.x) * 0.3;
+      fc.fillRect(Math.round(sx), s.y, s.r <= 1 ? 1 : 2, s.r <= 1 ? 1 : 2);
     }
+    fc.globalAlpha = 1;
   }
-  ctx.globalAlpha = 1;
+  if (_starOC) ctx.drawImage(_starOC, 0, 0);
 
-  ctx.fillStyle = '#2d1060';
-  for (const c of clouds) {
+  // clouds — blit pre-baked cloud sprites
+  for (let i = 0; i < clouds.length; i++) {
+    const c = clouds[i];
+    const oc = _cloudOCs[i];
     const cx = ((c.x - cameraX * c.speed) % WORLD_W + WORLD_W) % WORLD_W;
-    ctx.beginPath(); ctx.ellipse(cx, c.y, c.w, 10, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx - c.w * 0.3, c.y + 4, c.w * 0.6, 8, 0, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(cx + c.w * 0.3, c.y + 4, c.w * 0.5, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.drawImage(oc, Math.round(cx - oc._cw / 2), Math.round(c.y - 10));
   }
 }
 
@@ -235,77 +258,58 @@ function drawRain() {
     if (d.x < 0) d.x += VIEW_W;
   }
   // draw all streaks in one pass, then all tips in one pass
-  ctx.save();
   ctx.globalAlpha = 0.18;
   ctx.fillStyle = '#a0c4ff';
   for (const d of raindrops) ctx.fillRect(Math.floor(d.x), Math.floor(d.y), 1, d.len);
   ctx.globalAlpha = 0.28;
   for (const d of raindrops) ctx.fillRect(Math.floor(d.x), Math.floor(d.y), 1, 1);
   ctx.globalAlpha = 1;
-  ctx.restore();
+}
+
+function _bakePlatform(p) {
+  const oc = getOC('plat_' + p.x + '_' + p.y, p.w, p.h);
+  const fc = oc._ctx;
+  // pool walls, floors, and rock slabs use their raw color — no grass
+  const isRock = p.color === '#1a1a2e' || p.color === '#1a2a3a';
+  if (p.oneWay) {
+    fc.fillStyle = '#7a5544'; fc.fillRect(0, 0, p.w, 3);
+    fc.fillStyle = p.color;  fc.fillRect(0, 3, p.w, p.h - 3);
+    fc.fillStyle = '#5c8a3c';
+    for (let gx = 4; gx < p.w - 4; gx += 8) fc.fillRect(gx, 0, 2, 3);
+  } else if (isRock) {
+    fc.fillStyle = p.color; fc.fillRect(0, 0, p.w, p.h);
+  } else {
+    const totalH = p.h;
+    fc.fillStyle = '#4a9e30'; fc.fillRect(0, 0, p.w, 3);
+    fc.fillStyle = '#6dc442';
+    for (let gx = 2; gx < p.w; gx += 6) fc.fillRect(gx, 0, 2, 2);
+    fc.fillStyle = '#7a4f2a'; fc.fillRect(0, 3, p.w, 10);
+    fc.fillStyle = '#5c3a1e'; fc.fillRect(0, 13, p.w, 20);
+    fc.fillStyle = '#3d2410'; fc.fillRect(0, 33, p.w, 30);
+    fc.fillStyle = '#2e2218'; fc.fillRect(0, 63, p.w, 20);
+    if (totalH > 83) {
+      fc.fillStyle = '#1a2a3a'; fc.fillRect(0, 83, p.w, totalH - 83);
+      fc.fillStyle = '#1e3d5a';
+      for (let wy2 = 90; wy2 < totalH; wy2 += 12)
+        for (let wx2 = 3; wx2 < p.w - 3; wx2 += 18)
+          fc.fillRect(wx2, wy2, 8, 1);
+    }
+    fc.fillStyle = '#4a3828';
+    for (let dx = 10; dx < p.w - 10; dx += 23) {
+      fc.fillRect(dx,      16, 3, 2);
+      fc.fillRect(dx + 11, 28, 2, 2);
+      fc.fillRect(dx + 5,  42, 3, 2);
+    }
+  }
+  p._oc = oc;
 }
 
 function drawPlatforms() {
   for (const p of platforms) {
     const sx = Math.round(p.x - cameraX);
     const sy = Math.round(p.y - cameraY);
-    // cull offscreen
     if (sx + p.w < 0 || sx > VIEW_W || sy + p.h < 0 || sy > VIEW_H) continue;
-
-    if (p.oneWay) {
-      // small floating platform — simple brown plank with grass tuft
-      ctx.fillStyle = '#7a5544'; ctx.fillRect(sx, sy, p.w, 3);
-      ctx.fillStyle = p.color;  ctx.fillRect(sx, sy + 3, p.w, p.h - 3);
-      ctx.fillStyle = '#5c8a3c';
-      for (let gx = sx + 4; gx < sx + p.w - 4; gx += 8) ctx.fillRect(gx, sy, 2, 3);
-    } else {
-      // tall ground slab — layered like a real cross-section
-      const totalH = p.h;
-
-      // grass top (3px)
-      ctx.fillStyle = '#4a9e30';
-      ctx.fillRect(sx, sy, p.w, 3);
-
-      // bright grass detail (1px highlights every few pixels)
-      ctx.fillStyle = '#6dc442';
-      for (let gx = sx + 2; gx < sx + p.w; gx += 6) ctx.fillRect(gx, sy, 2, 2);
-
-      // topsoil (next 10px, warm brown)
-      ctx.fillStyle = '#7a4f2a';
-      ctx.fillRect(sx, sy + 3, p.w, 10);
-
-      // dirt layer 1 (darker, 20px)
-      ctx.fillStyle = '#5c3a1e';
-      ctx.fillRect(sx, sy + 13, p.w, 20);
-
-      // dirt layer 2 (darker still, 30px)
-      ctx.fillStyle = '#3d2410';
-      ctx.fillRect(sx, sy + 33, p.w, 30);
-
-      // transition to wet dirt (20px, slight blue tint)
-      ctx.fillStyle = '#2e2218';
-      ctx.fillRect(sx, sy + 63, p.w, 20);
-
-      // waterlogged / underground water layer (rest)
-      if (totalH > 83) {
-        ctx.fillStyle = '#1a2a3a';
-        ctx.fillRect(sx, sy + 83, p.w, totalH - 83);
-        // water shimmer lines
-        ctx.fillStyle = '#1e3d5a';
-        for (let wy = sy + 90; wy < sy + totalH; wy += 12) {
-          for (let wx = sx + 3; wx < sx + p.w - 3; wx += 18) {
-            ctx.fillRect(wx, wy, 8, 1);
-          }
-        }
-      }
-
-      // stone pebble details scattered in dirt
-      ctx.fillStyle = '#4a3828';
-      for (let dx = 10; dx < p.w - 10; dx += 23) {
-        ctx.fillRect(sx + dx,      sy + 16, 3, 2);
-        ctx.fillRect(sx + dx + 11, sy + 28, 2, 2);
-        ctx.fillRect(sx + dx + 5,  sy + 42, 3, 2);
-      }
-    }
+    if (!p._oc) _bakePlatform(p);
+    ctx.drawImage(p._oc, sx, sy);
   }
 }

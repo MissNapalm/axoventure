@@ -112,7 +112,7 @@ function drawGoldenKey() {
   const sx = Math.round(goldenKey.x - cameraX);
   const sy = Math.round(goldenKey.y - cameraY + bob);
 
-  const t = Date.now() * 0.003;
+  const t = frameNow * 0.003;
   ctx.save();
   ctx.imageSmoothingEnabled = false;
 

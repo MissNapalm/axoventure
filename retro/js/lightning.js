@@ -94,7 +94,7 @@ function drawLightning() {
 
     // dim blue-white flash — not pure white, safe brightness
     const flashAlpha = alpha * alpha * 0.3;
-    ctx.fillStyle = `rgba(180,220,255,${flashAlpha})`;
+    ctx.fillStyle = 'rgba(180,220,255,' + flashAlpha + ')';
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   }
 

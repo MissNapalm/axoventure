@@ -41,6 +41,8 @@ const player = {
   waterExitSpin: 0,   // spin angle when launched out of water by dash
   dashedFromWater: false,
   splash: [],         // splash particles
+  waterDashHeld: false,
+  groundDashFlash: 0, // decays from 1→0 after dash starts, drives tint alpha
 };
 
 function resetLevel() {
@@ -97,6 +99,10 @@ function resetLevel() {
     e.hitFlash = 0; e.deathFlash = 0; e.particles = [];
     e.bobPhase = Math.random() * Math.PI * 2;
   }
+  // reset fury and combo
+  fury.active = false; fury.ready = false; fury.kills = 0; fury.timer = 0; fury.flashTimer = 0;
+  combo.count = 0; combo.timer = 0; combo.displayTimer = 0; combo.peak = 0;
+
   // reset enemies
   for (const e of enemies) {
     e.x = e.startX;
@@ -112,7 +118,7 @@ function resetLevel() {
 }
 
 function hurtPlayer() {
-  if (player.hurtTimer > 0 || player.postDashTimer > 0 || coderMode || player.dashing || player.groundDashing || player.homingWindup > 0) return;
+  if (player.hurtTimer > 0 || player.postDashTimer > 0 || coderMode || isFuryActive() || player.dashing || (player.groundDashing && !player.inWater) || player.homingWindup > 0) return;
   player.hp--;
   player.hurtTimer = HURT_FRAMES;
   player.dashing = false; player.dashTarget = null;
@@ -207,6 +213,8 @@ function spawnImpactVFX(x, y) {
 
 function updatePlayer() {
   if (consumeKey('KeyQ')) coderMode = !coderMode;
+  if (consumeKey('KeyF') && fury.ready && !fury.active) activateFury();
+  if (consumeKey('KeyW') && !fury.active) activateFury();
 
   // M key: throw if carrying, else dash, else run held
   if (consumeKey('KeyM')) {
@@ -220,25 +228,27 @@ function updatePlayer() {
       if (nearby) {
         openDialog(nearby);
       } else if (!player.groundDashing) {
-        if (player.onGround || (!player.airDashUsed && !player.dashing)) {
+        if (player.onGround || player.inWater || fury.active || (!player.airDashUsed && !player.dashing)) {
           const dLeft  = keys['KeyS'];
           const dRight = keys['KeyC'];
           const dUp    = keys['KeyD'] || keys['KeyL'];
           const dDown  = keys['KeyX'];
-          const hasAny = dLeft || dRight || dUp || dDown;
-          const dx = dRight ? 1 : dLeft ? -1 : (hasAny ? 0 : (player.facingLeft ? -1 : 1));
-          const dy = dUp ? -1 : (dDown && !player.onGround) ? 1 : 0;
+          const rawDx  = (dLeft && !dRight) ? -1 : (dRight && !dLeft) ? 1 : 0;
+          const rawDy  = (dUp && !dDown) ? -1 : (dDown && !dUp && (!player.onGround || player.inWater)) ? 1 : 0;
+          const dx = rawDx !== 0 || rawDy !== 0 ? rawDx : (player.facingLeft ? -1 : 1);
+          const dy = rawDy;
           const len = Math.hypot(dx, dy) || 1;
           const nx = dx / len;
           const ny = dy / len;
+          const dashSpd = GROUND_DASH_SPEED;
           player.groundDashing = true;
           player.groundDashTimer = GROUND_DASH_FRAMES;
+          player.groundDashFlash = 1;
           player.groundDashAngle = Math.atan2(ny, nx);
-          player.vx = nx * GROUND_DASH_SPEED;
-          player.vy = ny * GROUND_DASH_SPEED;
+          player.vx = nx * dashSpd;
+          player.vy = ny * dashSpd;
           if (nx !== 0) player.facingLeft = nx < 0;
           if (!player.onGround && !player.inWater) player.airDashUsed = true;
-          // flag that this dash started in water — spin triggers on water exit
           if (player.inWater) player.dashedFromWater = true;
         }
       }
@@ -259,12 +269,14 @@ function updatePlayer() {
     return;
   }
 
+  // when both left+right held, last-pressed wins
   const left  = keys['KeyS'];
   const right = keys['KeyC'];
   const up    = keys['KeyD'];
   const down  = keys['KeyX'];
   const run   = keys['KeyM'];
-  const speed = run ? S.walkSpeed * S.runMult : S.walkSpeed;
+  const furyMult = fury.active ? S.furySpeedMult : 1;
+  const speed = (run ? S.walkSpeed * S.runMult : S.walkSpeed) * furyMult;
 
   if (player.knockbackTimer > 0) player.knockbackTimer--;
 
@@ -345,14 +357,25 @@ function updatePlayer() {
   if (player.inWater) {
     player.swimBobPhase += 0.07;
     player.airDashUsed = false; // unlimited dash in water
+
+    // dash bubble trail — one per frame from sprite center
+    if (player.groundDashing) {
+      player.bubbles.push({
+        x: player.x + player.w / 2 + (Math.random() - 0.5) * 6,
+        y: player.y + player.h / 2 + (Math.random() - 0.5) * 6,
+        r: 1 + Math.floor(Math.random() * 2),
+        life: 15 + Math.floor(Math.random() * 15),
+        maxLife: 30,
+        rise: 0.6 + Math.random() * 0.8,
+        wobble: Math.random() * Math.PI * 2,
+      });
+    }
+
     player.bubbleTimer--;
     if (player.bubbleTimer <= 0) {
       player.bubbleTimer = 18 + Math.floor(Math.random() * 20);
-      // mouth is near the front of axo's head
-      const mouthX = player.facingLeft
-        ? player.x + 4
-        : player.x + player.w - 4;
-      const mouthY = player.y + 6;
+      const mouthX = player.x + player.w / 2;
+      const mouthY = player.y + player.h / 2;
       const count = Math.random() < 0.4 ? 2 : 1;
       for (let i = 0; i < count; i++) {
         player.bubbles.push({
@@ -372,7 +395,7 @@ function updatePlayer() {
 
   if (player.inWater && !player.groundDashing && !player.dashing && player.homingWindup === 0) {
     // free swim in any direction
-    const SWIM_SPEED = S.walkSpeed * 1.3;
+    const SWIM_SPEED = S.walkSpeed * 1.3 * furyMult;
     let svx = 0, svy = 0;
     if (left)  { svx = -SWIM_SPEED; player.facingLeft = true;  player.moving = true; }
     if (right) { svx =  SWIM_SPEED; player.facingLeft = false; player.moving = true; }
@@ -385,7 +408,7 @@ function updatePlayer() {
     // gentle bob when idle
     if (!player.moving) {
       player.vy += (0 - player.vy) * 0.12;
-      player.vy += Math.sin(Date.now() * 0.003) * 0.06;
+      player.vy += Math.sin(frameNow * 0.003) * 0.06;
     }
     player.onGround = false;
     player.homingUsed = false;
@@ -396,9 +419,10 @@ function updatePlayer() {
     else            { player.vx *= 0.7; }
   }
 
-  const jumpPressed = player.inWater
-    ? consumeKey('KeyL')
-    : consumeKey('KeyD') || consumeKey('KeyL');
+  const jumpPressedL = consumeKey('KeyL');
+  const jumpPressedD = !player.inWater && consumeKey('KeyD');
+  const jumpPressed  = player.inWater ? jumpPressedL : (jumpPressedD || jumpPressedL);
+  const homingPressed = jumpPressedL && !player.inWater;
   if (jumpPressed && player.onGround && !player.inWater) { player.vy = -S.jumpForce; player.onGround = false; }
 
   if (player.hurtTimer > 0) player.hurtTimer--;
@@ -410,11 +434,36 @@ function updatePlayer() {
 
   if (player.killSpin > 0) player.killSpin--;
 
-  // Ground dash countdown
+  // Ground dash countdown — underwater: keep dashing while M held, steer with direction keys
+  if (player.groundDashing && player.inWater) {
+    if (keys['KeyM']) player.groundDashTimer = GROUND_DASH_FRAMES;
+    // burst speed fades to sustained speed as groundDashFlash decays
+    const burstSpd = GROUND_DASH_SPEED;
+    const sustainSpd = GROUND_DASH_SPEED * 0.6;
+    const spd = sustainSpd + (burstSpd - sustainSpd) * player.groundDashFlash;
+    const dLeft  = keys['KeyS'];
+    const dRight = keys['KeyC'];
+    const dUp    = keys['KeyD'] || keys['KeyL'];
+    const dDown  = keys['KeyX'];
+    const hasAny = dLeft || dRight || dUp || dDown;
+    if (hasAny) {
+      const dx = (dLeft && !dRight) ? -1 : (dRight && !dLeft) ? 1 : 0;
+      const dy = (dUp && !dDown) ? -1 : (dDown && !dUp) ? 1 : 0;
+      const len = Math.hypot(dx, dy) || 1;
+      player.groundDashAngle = Math.atan2(dy, dx);
+      player.vx = (dx / len) * spd;
+      player.vy = (dy / len) * spd;
+      if (dx !== 0) player.facingLeft = dx < 0;
+    } else {
+      player.vx = Math.cos(player.groundDashAngle) * spd;
+      player.vy = Math.sin(player.groundDashAngle) * spd;
+    }
+  }
   if (player.groundDashing) {
     player.groundDashTimer--;
-    if (player.groundDashTimer <= 0) { player.groundDashing = false; player.vx *= 0.3; }
+    if (player.groundDashTimer <= 0) { player.groundDashing = false; player.groundDashFlash = 0; player.vx *= 0.3; }
   }
+  if (player.groundDashFlash > 0) player.groundDashFlash = Math.max(0, player.groundDashFlash - 0.06);
 
   // Homing windup hover → launch
   if (player.homingWindup > 0) {
@@ -429,16 +478,22 @@ function updatePlayer() {
     }
   }
 
-  // Homing attack: triggered by jump press while airborne or swimming
-  if (!player.onGround && !player.dashing && !player.homingUsed && player.homingWindup === 0 && jumpPressed && !player.wasOnGround) {
+  // Homing attack: triggered by L (not D) while airborne, or L while swimming
+  const _homingTrigger = player.inWater ? jumpPressedL : homingPressed;
+  if (!player.onGround && !player.dashing && !(player.homingUsed && !isFuryActive()) && player.homingWindup === 0 && _homingTrigger && !player.wasOnGround) {
     const pcx = player.x + player.w / 2;
     const pcy = player.y + player.h / 2;
     let best = null, bestDist = HOMING_RANGE;
-    for (const e of [...enemies, ...redEnemies, ...fishEnemies, ...bigFishEnemies]) {
-      if (e.dead || e.flipped || e.carried) continue;
-      const ey = (e._y ? e._y : e.y) + e.h / 2;
-      const dist = Math.hypot((e.x + e.w / 2) - pcx, ey - pcy);
-      if (dist < bestDist) { bestDist = dist; best = e; }
+    const _allE = [enemies, redEnemies, fishEnemies, bigFishEnemies];
+    for (let _li = 0; _li < _allE.length; _li++) {
+      const _lst = _allE[_li];
+      for (let _ei = 0; _ei < _lst.length; _ei++) {
+        const e = _lst[_ei];
+        if (e.dead || e.flipped || e.carried) continue;
+        const ey = (e._y ? e._y : e.y) + e.h / 2;
+        const dist = Math.hypot((e.x + e.w / 2) - pcx, ey - pcy);
+        if (dist < bestDist) { bestDist = dist; best = e; }
+      }
     }
     if (best) {
       player.homingWindup = S.homingHover;
@@ -469,14 +524,33 @@ function updatePlayer() {
   if (player.waterExitSpin > 0) player.waterExitSpin += 0.42; // ~1 rotation per 15 frames
 
   // update splash particles
-  for (const p of player.splash) {
+  for (let i = player.splash.length - 1; i >= 0; i--) {
+    const p = player.splash[i];
     p.x += p.vx; p.y += p.vy; p.vy += p.gravity; p.life--;
+    if (p.life <= 0) player.splash.splice(i, 1);
   }
-  player.splash = player.splash.filter(p => p.life > 0);
+
+  // fury sparks — every 3 frames to keep particle count low
+  if (fury.active && fury.flashTimer % 3 === 0) {
+    const FURY_COLORS = ['#ffffff', '#ffe566', '#ffaa00', '#ff6600'];
+    const angle = Math.random() * Math.PI * 2;
+    const dist  = 4 + Math.random() * 10;
+    player.sparks.push({
+      x: player.x + player.w / 2 + Math.cos(angle) * dist,
+      y: player.y + player.h / 2 + Math.sin(angle) * dist,
+      vx: Math.cos(angle) * (1 + Math.random() * 2),
+      vy: Math.sin(angle) * (1 + Math.random() * 2) - 1,
+      life: 8 + Math.floor(Math.random() * 10), maxLife: 18,
+      color: FURY_COLORS[Math.floor(Math.random() * FURY_COLORS.length)],
+      size: Math.random() < 0.5 ? 2 : 1, kind: 'box', gravity: 0.05,
+    });
+  }
 
   // fade trail
-  for (const t of player.trail) t.life--;
-  player.trail = player.trail.filter(t => t.life > 0);
+  for (let i = player.trail.length - 1; i >= 0; i--) {
+    player.trail[i].life--;
+    if (player.trail[i].life <= 0) player.trail.splice(i, 1);
+  }
 
   if (!player.dashing && !player.groundDashing && player.homingWindup === 0 && !player.inWater) player.vy += S.gravity;
   player.x += player.vx;
@@ -500,7 +574,6 @@ function updatePlayer() {
       const impactY = (e._y ? e._y : e.y) + e.h / 2;
       if (e.bigFish) {
         hitBigFishByHoming(e, impactX, impactY);
-        if (!e.dead && player.hurtTimer === 0) player.hurtTimer = 20;
       } else if (e.fish) {
         hitFishByHoming(e, impactX, impactY);
       } else if (e.red) {
@@ -516,7 +589,7 @@ function updatePlayer() {
         player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
       } else {
         // spiked AND not freshly triggered by the player (lastHitBy===null means pre-existing spike)
-        const spiked = e.stunTimer > 0 && e.lastHitBy === null;
+        const spiked = e.stunTimer > 0 && e.lastHitBy === null && !isFuryActive();
         if (spiked) {
           hurtPlayer();
         } else {
@@ -543,46 +616,61 @@ function updatePlayer() {
     const inset = 6;
     const px1 = player.x + inset, px2 = player.x + player.w - inset;
     const py1 = player.y + inset, py2 = player.y + player.h - inset;
-    for (const e of [...enemies, ...redEnemies, ...fishEnemies, ...bigFishEnemies]) {
-      if (e.dead || e.flipped || e.carried) continue;
-      const ex1 = e.x + inset, ex2 = e.x + e.w - inset;
-      const ey1 = (e._y ? e._y : e.y) + inset;
-      const ey2 = ey1 + e.h - inset * 2;
-      if (Math.min(px2, ex2) - Math.max(px1, ex1) > 0 && Math.min(py2, ey2) - Math.max(py1, ey1) > 0) {
-        player.groundDashing = false;
-        if (e.bigFish) {
-          const ex = e.x + e.w / 2, ey = e.y + e.h / 2;
-          hitBigFishByDash(e, ex, ey);
-          if (!e.dead && player.hurtTimer === 0) player.hurtTimer = 20;
-        } else if (e.fish) {
-          const ex = e.x + e.w / 2, ey = e.y + e.h / 2;
-          hitFishByDash(e, ex, ey);
-        } else if (e.red) {
-          flipRedEnemy(e);
-          player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -S.redBounceBack : S.redBounceBack;
-          player.knockbackTimer = 12;
-          hitFreezeTimer = HIT_FREEZE_FRAMES;
-          screenShakeTimer = SCREEN_SHAKE_FRAMES;
-        } else {
-          const spiked = e.stunTimer > 0 && e.lastHitBy === null;
-          if (spiked) {
-            hurtPlayer();
-          } else {
-            player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
-            player.vy = -4;
-            const ex = e.x + e.w / 2, ey = (e._y ? e._y : e.y) + e.h / 2;
-            e.lastHitBy = 'dash';
-            hitEnemy(e);
+    const _gdLists = [enemies, redEnemies, fishEnemies, bigFishEnemies];
+    let _gdHit = false;
+    for (let _li = 0; _li < _gdLists.length && !_gdHit; _li++) {
+      const _lst = _gdLists[_li];
+      for (let _ei = 0; _ei < _lst.length && !_gdHit; _ei++) {
+        const e = _lst[_ei];
+        if (e.dead || e.flipped || e.carried) continue;
+        const ex1 = e.x + inset, ex2 = e.x + e.w - inset;
+        const ey1 = (e._y ? e._y : e.y) + inset;
+        const ey2 = ey1 + e.h - inset * 2;
+        if (Math.min(px2, ex2) - Math.max(px1, ex1) > 0 && Math.min(py2, ey2) - Math.max(py1, ey1) > 0) {
+          _gdHit = true;
+          player.groundDashing = false;
+          if (e.bigFish) {
+            const ex = e.x + e.w / 2, ey = e.y + e.h / 2;
+            hitBigFishByDash(e, ex, ey);
+            if (!e.dead && player.hurtTimer === 0) player.hurtTimer = 20;
+          } else if (e.fish) {
+            const ex = e.x + e.w / 2, ey = e.y + e.h / 2;
+            hitFishByDash(e, ex, ey);
+          } else if (e.red) {
+            if (isFuryActive()) {
+              e.dead = true;
+              spawnDeathStars(e);
+              triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
+              screenShakeTimer = 6;
+              player.killSpin = 10;
+              registerKill();
+            } else {
+              flipRedEnemy(e);
+            }
+            player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -S.redBounceBack : S.redBounceBack;
+            player.knockbackTimer = 12;
             hitFreezeTimer = HIT_FREEZE_FRAMES;
             screenShakeTimer = SCREEN_SHAKE_FRAMES;
-            spawnImpactVFX(ex, ey);
-            if (!e.dead) {
-              player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
-              if (player.postDashTimer === 0) player.postDashTimer = 20;
+          } else {
+            const spiked = e.stunTimer > 0 && e.lastHitBy === null && !isFuryActive();
+            if (spiked) {
+              hurtPlayer();
+            } else {
+              player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -8 : 8;
+              player.vy = -4;
+              const ex = e.x + e.w / 2, ey = (e._y ? e._y : e.y) + e.h / 2;
+              e.lastHitBy = 'dash';
+              hitEnemy(e);
+              hitFreezeTimer = HIT_FREEZE_FRAMES;
+              screenShakeTimer = SCREEN_SHAKE_FRAMES;
+              spawnImpactVFX(ex, ey);
+              if (!e.dead) {
+                player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
+                if (player.postDashTimer === 0) player.postDashTimer = 20;
+              }
             }
           }
         }
-        break;
       }
     }
   }
@@ -599,7 +687,7 @@ function updatePlayer() {
   }
 
   const wasOnGround = player.onGround;
-  resolveCollisions();
+  if (!(fury.active && player.dashing)) resolveCollisions();
   player.wasOnGround = wasOnGround;
   if (player.onGround) { player.dashing = false; player.dashTarget = null; player.homingUsed = false; player.airDashUsed = false; }
 
@@ -625,30 +713,58 @@ function drawPlayer() {
   const px     = Math.round(player.x - cameraX);
   const bottom = Math.round(player.y + player.h - cameraY);
 
-  // draw trail — pixelated rectangles, fading and shrinking toward tail
+  // draw trail
   if (player.trail.length > 1) {
     const n = player.trail.length;
+    const isDash   = player.groundDashing;
+    const isHoming = player.dashing;
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     for (let i = 0; i < n; i++) {
-      const t = i / (n - 1); // 0=tail, 1=head
+      const t = i / (n - 1); // 0=oldest/tail, 1=newest/head
       const pt = player.trail[i];
-      const alpha = t * t * 0.75;
-      const size = Math.max(1, Math.round(t * 6));
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(
-        Math.round(pt.x - cameraX) - (size >> 1),
-        Math.round(pt.y - cameraY) - (size >> 1),
-        size, size
-      );
+      if (isDash) {
+        // ground dash: bright cyan-white teardrop trail, fades to tail
+        const alpha = t * t * 0.85;
+        const w = Math.max(1, Math.round(t * 7));
+        const h = Math.max(1, Math.round(t * 4));
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = t > 0.6 ? '#e0f8ff' : '#ffffff';
+        ctx.fillRect(
+          Math.round(pt.x - cameraX) - (w >> 1),
+          Math.round(pt.y - cameraY) - (h >> 1),
+          w, h
+        );
+      } else if (isHoming) {
+        // homing: bright white orbs, more visible
+        const alpha = t * t * 0.9;
+        const size = Math.max(1, Math.round(t * 7));
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(
+          Math.round(pt.x - cameraX) - (size >> 1),
+          Math.round(pt.y - cameraY) - (size >> 1),
+          size, size
+        );
+      } else {
+        // generic trail (e.g. shortly after dash ends)
+        const alpha = t * t * 0.5;
+        const size = Math.max(1, Math.round(t * 4));
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(
+          Math.round(pt.x - cameraX) - (size >> 1),
+          Math.round(pt.y - cameraY) - (size >> 1),
+          size, size
+        );
+      }
     }
     ctx.restore();
   }
 
   const standingSpr = sprites['standing'].naturalWidth ? sprites['standing'] : sprites['walk1'];
   let sprite;
-  if (player.inWater && !player.dashing && !player.groundDashing) {
+  if (player.inWater && !player.dashing) {
     sprite = sprites[player.frame % 2 === 0 ? 'swim1' : 'swim2'];
   } else if (player.dashing) {
     sprite = sprites['walk2'];
@@ -674,12 +790,19 @@ function drawPlayer() {
   const yOffset = (!player.onGround ? S.jumpYOffset : 0) + (player.groundDashing ? S.dashYOffset : 0) + dashJitter + swimBob;
   const py = bottom - sh + yOffset;
 
-  // flicker during invincibility
-  if (player.hurtTimer > 0 && Math.floor(player.hurtTimer / 4) % 2 === 0) return;
+  // flicker during invincibility (not during fury — fury has its own flash)
+  if (player.hurtTimer > 0 && !isFuryActive() && Math.floor(player.hurtTimer / 4) % 2 === 0) return;
+
+  // fury white pulse: smooth sine wave, 0→1→0
+  const furyOn = isFuryActive();
+  const furyAlpha = furyOn
+    ? (Math.sin(fury.flashTimer / Math.max(1, S.furyFlashSpeed)) * 0.5 + 0.5)
+    : 0;
 
   // build tinted sprite on persistent offscreen canvas
   let drawSpr = sprite;
-  if (player.dashing || player.groundDashing || player.homingWindup > 0 || player.hurtTimer > 0) {
+  const _needTint = player.groundDashFlash > 0 || player.hurtTimer > 0 || furyOn;
+  if (_needTint) {
     const oc = getOC('player_tint', sw, sh);
     const oc2d = oc._ctx;
     oc2d.clearRect(0, 0, sw, sh);
@@ -688,7 +811,13 @@ function drawPlayer() {
     oc2d.imageSmoothingEnabled = false;
     oc2d.drawImage(sprite, 0, 0, sw, sh);
     oc2d.globalCompositeOperation = 'source-atop';
-    oc2d.fillStyle = (player.hurtTimer > 0 && !player.dashing && !player.homingWindup) ? 'rgba(255,0,0,0.55)' : 'rgba(255,255,255,0.9)';
+    if (furyOn) {
+      oc2d.fillStyle = 'rgba(255,255,255,' + furyAlpha.toFixed(3) + ')';
+    } else if (player.hurtTimer > 0) {
+      oc2d.fillStyle = 'rgba(255,0,0,0.55)';
+    } else {
+      oc2d.fillStyle = 'rgba(255,255,255,' + (player.groundDashFlash * 0.9).toFixed(3) + ')';
+    }
     oc2d.fillRect(0, 0, sw, sh);
     oc2d.globalCompositeOperation = 'source-over';
     drawSpr = oc;
@@ -735,6 +864,45 @@ function drawPlayer() {
 
   ctx.restore();
 
+  // shades overlay during fury — Y is anchored from sprite bottom so eyes stay consistent
+  if (furyOn && player.waterExitSpin === 0 && sprites['shades'] && sprites['shades'].naturalWidth) {
+    const shd = sprites['shades'];
+    const facingLeft = player.facingLeft;
+    const ox = facingLeft ? S.shadesXL : S.shadesXR;
+    const oy = facingLeft ? S.shadesYL : S.shadesYR;
+    const isJumping = sprite === sprites['jump'];
+    const isSwimming = sprite === sprites['swim1'] || sprite === sprites['swim2'];
+    const fox = isJumping ? (facingLeft ? S.shadesJumpXL : S.shadesJumpXR)
+              : isSwimming ? (facingLeft ? S.shadesSwimXL : S.shadesSwimXR)
+              : ox;
+    const foy = isJumping ? (facingLeft ? S.shadesJumpYL : S.shadesJumpYR)
+              : isSwimming ? (facingLeft ? S.shadesSwimYL : S.shadesSwimYR)
+              : oy;
+    const fsdx = facingLeft ? px + fox : px + (sw - shd.naturalWidth) - fox;
+    const fsdy = (py + sh) - foy - shd.naturalHeight;
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    if (!facingLeft) {
+      ctx.scale(-1, 1);
+      ctx.drawImage(shd, -(fsdx + shd.naturalWidth), fsdy, shd.naturalWidth, shd.naturalHeight);
+      if (furyAlpha > 0) {
+        ctx.globalAlpha = furyAlpha;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-(fsdx + shd.naturalWidth), fsdy, shd.naturalWidth, shd.naturalHeight);
+        ctx.globalAlpha = 1;
+      }
+    } else {
+      ctx.drawImage(shd, fsdx, fsdy, shd.naturalWidth, shd.naturalHeight);
+      if (furyAlpha > 0) {
+        ctx.globalAlpha = furyAlpha;
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(fsdx, fsdy, shd.naturalWidth, shd.naturalHeight);
+        ctx.globalAlpha = 1;
+      }
+    }
+    ctx.restore();
+  }
+
   // splash particles
   if (player.splash.length > 0) {
     ctx.save();
@@ -763,9 +931,8 @@ function drawPlayer() {
   if (crossTarget && !crossTarget.dead) {
     const tx = Math.round(crossTarget.x + crossTarget.w / 2 - cameraX);
     const ty = Math.round((crossTarget._y ? crossTarget._y : crossTarget.y) + crossTarget.h / 2 - cameraY);
-    const now2 = Date.now();
-    const spin = (now2 * 0.004) % (Math.PI * 2);
-    const pulse = 0.6 + 0.4 * Math.sin(now2 * 0.015);
+    const spin = (frameNow * 0.004) % (Math.PI * 2);
+    const pulse = 0.6 + 0.4 * Math.sin(frameNow * 0.015);
     const r = 10 + crossTarget.w * 0.3;
     ctx.save();
     ctx.translate(tx, ty);
@@ -835,22 +1002,22 @@ function drawPlayer() {
     const dy = newest.y - older.y;
     const len = Math.hypot(dx, dy) || 1;
     const nx = dx / len; const ny = dy / len;
+    const prevAlpha = ctx.globalAlpha;
+    ctx.strokeStyle = '#c0f0ff';
+    ctx.lineWidth = 1;
     for (let i = 0; i < 5; i++) {
       const spread = (i - 2) * 4;
       const ox = -ny * spread; const oy = nx * spread;
       const sx = newest.x - cameraX + ox;
       const sy = newest.y - cameraY + oy;
-      const lineLen = 8 + i * 2;
-      ctx.save();
-      ctx.globalAlpha = 0.35 - i * 0.04;
-      ctx.strokeStyle = '#c0f0ff';
-      ctx.lineWidth = 1;
+      const lineLen = 10 + i * 3;
+      ctx.globalAlpha = 0.55 - i * 0.08;
       ctx.beginPath();
       ctx.moveTo(sx, sy);
       ctx.lineTo(sx - nx * lineLen, sy - ny * lineLen);
       ctx.stroke();
-      ctx.restore();
     }
+    ctx.globalAlpha = prevAlpha;
   }
 
   if (player.impactFlash > 0) {
@@ -864,107 +1031,92 @@ function drawPlayer() {
   }
 
   // shockwave rings expanding outward from impact
-  for (let i = player.shockwaves.length - 1; i >= 0; i--) {
-    const sw = player.shockwaves[i];
-    if (sw.delay > 0) { sw.delay--; continue; }
-    sw.life--;
-    sw.r += sw.speed;
-    if (sw.life <= 0) { player.shockwaves.splice(i, 1); continue; }
-    const alpha = (sw.life / sw.maxLife) * 0.9;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = sw.color;
-    ctx.lineWidth = sw.lw || 2;
-    ctx.beginPath();
-    ctx.arc(Math.round(sw.x - cameraX), Math.round(sw.y - cameraY), sw.r, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
+  {
+    const prevAlpha = ctx.globalAlpha;
+    for (let i = player.shockwaves.length - 1; i >= 0; i--) {
+      const sw = player.shockwaves[i];
+      if (sw.delay > 0) { sw.delay--; continue; }
+      sw.life--;
+      sw.r += sw.speed;
+      if (sw.life <= 0) { player.shockwaves.splice(i, 1); continue; }
+      ctx.globalAlpha = (sw.life / sw.maxLife) * 0.9;
+      ctx.strokeStyle = sw.color;
+      ctx.lineWidth = sw.lw || 2;
+      ctx.beginPath();
+      ctx.arc(Math.round(sw.x - cameraX), Math.round(sw.y - cameraY), sw.r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = prevAlpha;
   }
 
   // sparks — pixel boxes and streak lines
-  for (let i = player.sparks.length - 1; i >= 0; i--) {
-    const sp = player.sparks[i];
-    sp.life--;
-    if (sp.life <= 0) { player.sparks.splice(i, 1); continue; }
-    if (sp.gravity) sp.vy += sp.gravity;
-    const alpha = (sp.life / sp.maxLife);
-    const sx = Math.round(sp.x - cameraX);
-    const sy = Math.round(sp.y - cameraY);
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = sp.color || '#ffffff';
-    ctx.strokeStyle = sp.color || '#ffffff';
-    if (sp.kind === 'box') {
-      const s = sp.size || 2;
-      ctx.fillRect(sx - (s / 2 | 0), sy - (s / 2 | 0), s, s);
-      sp.x += sp.vx; sp.y += sp.vy;
-    } else {
-      ctx.lineWidth = sp.size || 1.5;
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      sp.x += sp.vx; sp.y += sp.vy;
-      ctx.lineTo(Math.round(sp.x - cameraX), Math.round(sp.y - cameraY));
-      ctx.stroke();
+  {
+    const prevAlpha = ctx.globalAlpha;
+    for (let i = player.sparks.length - 1; i >= 0; i--) {
+      const sp = player.sparks[i];
+      sp.life--;
+      if (sp.life <= 0) { player.sparks.splice(i, 1); continue; }
+      if (sp.gravity) sp.vy += sp.gravity;
+      ctx.globalAlpha = sp.life / sp.maxLife;
+      const sx = Math.round(sp.x - cameraX);
+      const sy = Math.round(sp.y - cameraY);
+      if (sp.kind === 'box') {
+        ctx.fillStyle = sp.color || '#ffffff';
+        const s = sp.size || 2;
+        ctx.fillRect(sx - (s >> 1), sy - (s >> 1), s, s);
+        sp.x += sp.vx; sp.y += sp.vy;
+      } else {
+        ctx.strokeStyle = sp.color || '#ffffff';
+        ctx.lineWidth = sp.size || 1.5;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        sp.x += sp.vx; sp.y += sp.vy;
+        ctx.lineTo(Math.round(sp.x - cameraX), Math.round(sp.y - cameraY));
+        ctx.stroke();
+      }
     }
-    ctx.restore();
+    ctx.globalAlpha = prevAlpha;
   }
 
   // underwater tint — subtle blue overlay
   if (player.inWater) {
-    ctx.save();
     ctx.globalAlpha = 0.13;
     ctx.fillStyle = '#1a6090';
     ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    ctx.restore();
+    ctx.globalAlpha = 1;
   }
 
-  // bubbles from axo's mouth — pixelated circles
-  for (const b of player.bubbles) {
-    const alpha = (b.life / b.maxLife) * 0.85;
-    const bx = Math.round(b.x - cameraX);
-    const by = Math.round(b.y - cameraY);
-    const r = b.r;
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    // pixel-circle: draw as filled squares to keep the 16-bit look
-    ctx.fillStyle = '#c8eeff';
-    // outline pixels
-    for (let dx = -r; dx <= r; dx++) {
-      for (let dy = -r; dy <= r; dy++) {
-        const dist = Math.abs(dx) + Math.abs(dy); // diamond for pixel-art feel
-        if (dist === r || (r > 1 && dist === r - 1 && dx === 0 && dy === 0)) continue;
-        if (dist <= r) {
-          // interior — lighter, more transparent
-          ctx.globalAlpha = alpha * 0.25;
-          ctx.fillStyle = '#e8f8ff';
-          ctx.fillRect(bx + dx, by + dy, 1, 1);
-        }
+  // bubbles — fixed pixel patterns by radius, no save/restore per bubble
+  {
+    const prevAlpha = ctx.globalAlpha;
+    for (const b of player.bubbles) {
+      const alpha = (b.life / b.maxLife) * 0.85;
+      const bx = Math.round(b.x - cameraX);
+      const by = Math.round(b.y - cameraY);
+      const r = b.r;
+      if (r === 1) {
+        ctx.globalAlpha = alpha * 0.25; ctx.fillStyle = '#e8f8ff'; ctx.fillRect(bx, by, 1, 1);
+        ctx.globalAlpha = alpha;        ctx.fillStyle = '#a0d8f0';
+        ctx.fillRect(bx, by-1, 1,1); ctx.fillRect(bx, by+1, 1,1);
+        ctx.fillRect(bx-1, by, 1,1); ctx.fillRect(bx+1, by, 1,1);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(bx-1, by-1, 1, 1);
+      } else if (r === 2) {
+        ctx.globalAlpha = alpha * 0.25; ctx.fillStyle = '#e8f8ff';
+        ctx.fillRect(bx-1, by-1, 3, 1); ctx.fillRect(bx-1, by, 3, 1); ctx.fillRect(bx-1, by+1, 3, 1);
+        ctx.globalAlpha = alpha;        ctx.fillStyle = '#a0d8f0';
+        ctx.fillRect(bx-1, by-2, 2,1); ctx.fillRect(bx-1, by+2, 2,1);
+        ctx.fillRect(bx-2, by-1, 1,2); ctx.fillRect(bx+2, by-1, 1,2);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(bx-1, by-1, 1, 1);
+      } else {
+        ctx.globalAlpha = alpha * 0.25; ctx.fillStyle = '#e8f8ff';
+        ctx.fillRect(bx-2, by-2, 5, 5);
+        ctx.globalAlpha = alpha;        ctx.fillStyle = '#a0d8f0';
+        ctx.fillRect(bx-1, by-3, 3,1); ctx.fillRect(bx-1, by+3, 3,1);
+        ctx.fillRect(bx-3, by-1, 1,3); ctx.fillRect(bx+3, by-1, 1,3);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(bx-1, by-2, 1, 1);
       }
     }
-    // rim pixels
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = '#a0d8f0';
-    if (r === 1) {
-      ctx.fillRect(bx,   by-1, 1, 1);
-      ctx.fillRect(bx,   by+1, 1, 1);
-      ctx.fillRect(bx-1, by,   1, 1);
-      ctx.fillRect(bx+1, by,   1, 1);
-    } else if (r === 2) {
-      ctx.fillRect(bx-1, by-2, 2, 1);
-      ctx.fillRect(bx-1, by+2, 2, 1);
-      ctx.fillRect(bx-2, by-1, 1, 2);
-      ctx.fillRect(bx+2, by-1, 1, 2);
-    } else {
-      ctx.fillRect(bx-1, by-3, 3, 1);
-      ctx.fillRect(bx-1, by+3, 3, 1);
-      ctx.fillRect(bx-3, by-1, 1, 3);
-      ctx.fillRect(bx+3, by-1, 1, 3);
-    }
-    // highlight pixel (top-left of bubble)
-    ctx.globalAlpha = alpha * 0.9;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(bx - Math.max(1, r-1), by - Math.max(1, r-1), 1, 1);
-    ctx.restore();
+    ctx.globalAlpha = prevAlpha;
   }
 
   // kill text floats up and fades

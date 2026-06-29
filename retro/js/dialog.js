@@ -5,9 +5,26 @@ const dialog = {
   chars: 0,
   charTimer: 0,
   CHAR_INTERVAL: 2,
+  _cachedPage: -1,
+  _cachedLines: [],
+  _cachedBoxW: 0,
   get fullText() { return this.npc ? this.npc.lines[this.page].replace(/\n/g, ' ') : ''; },
   get done()     { return this.chars >= this.fullText.length; },
 };
+
+function _rebuildDialogCache() {
+  const PAD = 10;
+  const MAX_TEXT_W = VIEW_W - 16 - PAD * 2 - 12;
+  ctx.font = PIXEL_FONT;
+  const rawLines = dialog.npc.lines[dialog.page].split('\n');
+  const wrapped = [];
+  for (const raw of rawLines) for (const wl of wrapText(raw, MAX_TEXT_W)) wrapped.push(wl);
+  const nameW = ctx.measureText(dialog.npc.name).width;
+  const maxLineW = wrapped.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
+  dialog._cachedLines = wrapped;
+  dialog._cachedBoxW = Math.ceil(Math.max(nameW, maxLineW)) + PAD * 2 + 8;
+  dialog._cachedPage = dialog.page;
+}
 
 function openDialog(npc) {
   dialog.active = true;
@@ -15,6 +32,7 @@ function openDialog(npc) {
   dialog.page = 0;
   dialog.chars = 0;
   dialog.charTimer = 0;
+  dialog._cachedPage = -1;
 }
 
 function advanceDialog() {
@@ -27,6 +45,7 @@ function advanceDialog() {
   } else {
     dialog.chars = 0;
     dialog.charTimer = 0;
+    dialog._cachedPage = -1;
   }
 }
 
@@ -71,18 +90,10 @@ function drawDialog() {
   ctx.font = PIXEL_FONT;
   ctx.textBaseline = 'top';
 
-  // Wrap each \n-split segment independently
-  const rawLines = npc.lines[dialog.page].split('\n');
-  const wrappedLines = [];
-  for (const raw of rawLines) {
-    for (const wl of wrapText(raw, MAX_TEXT_W)) wrappedLines.push(wl);
-  }
-
-  // Size box to fit actual content
-  const nameW = ctx.measureText(npc.name).width;
-  const maxLineW = wrappedLines.reduce((m, l) => Math.max(m, ctx.measureText(l).width), 0);
-  const contentW = Math.max(nameW, maxLineW);
-  const BOX_W = Math.ceil(contentW) + PAD * 2 + 8;
+  // rebuild cache only when page changes
+  if (dialog._cachedPage !== dialog.page) _rebuildDialogCache();
+  const wrappedLines = dialog._cachedLines;
+  const BOX_W = dialog._cachedBoxW;
   const BOX_X = Math.round((VIEW_W - BOX_W) / 2);
   const BOX_Y = 68;
   const BOX_H = PAD + nameH + dividerGap + wrappedLines.length * lineH + PAD;
@@ -111,7 +122,7 @@ function drawDialog() {
     charsLeft = Math.max(0, charsLeft - line.length);
   });
 
-  if (dialog.done && Math.floor(Date.now() / 400) % 2 === 0) {
+  if (dialog.done && Math.floor(frameNow / 400) % 2 === 0) {
     ctx.fillStyle = '#b07aff';
     ctx.textBaseline = 'bottom';
     ctx.fillText('▼', BOX_X + BOX_W - PAD, BOX_Y + BOX_H - 3);

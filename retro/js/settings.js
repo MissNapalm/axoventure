@@ -20,6 +20,22 @@ const settings = {
   redFlipGrav:  { value: 0.49,  min: 0.01, max: 2.0,  step: 0.01, label: 'Red Flip Grav' },
   homingHover:  { value: 12,    min: 0,    max: 60,   step: 1,    label: 'Homing Hover' },
   stunFrames:   { value: 100,   min: 0,    max: 300,  step: 10,   label: 'Spike Stun Dur' },
+  furyFlashSpeed:{ value: 6,    min: 1,    max: 30,   step: 1,    label: 'Fury Flash Speed' },
+  furySpeedMult: { value: 1.6,  min: 1.0,  max: 4.0,  step: 0.1,  label: 'Fury Speed Mult' },
+  furyDuration:  { value: 960,  min: 60,   max: 3600, step: 60,   label: 'Fury Duration' },
+  furyKillFill:  { value: 3,    min: 1,    max: 20,   step: 1,    label: 'Fury Kill Fill' },
+  shadesXL:      { value: 9,    min: -30,  max: 30,   step: 1,    label: 'Shades X (left)' },
+  shadesYL:      { value: 16,   min: 0,    max: 60,   step: 1,    label: 'Shades Y (left)' },
+  shadesXR:      { value: 9,    min: -30,  max: 30,   step: 1,    label: 'Shades X (right)' },
+  shadesYR:      { value: 16,   min: 0,    max: 60,   step: 1,    label: 'Shades Y (right)' },
+  shadesJumpXL:  { value: 9,    min: -30,  max: 30,   step: 1,    label: 'Shades Jump X (left)' },
+  shadesJumpYL:  { value: 22,   min: 0,    max: 60,   step: 1,    label: 'Shades Jump Y (left)' },
+  shadesJumpXR:  { value: 9,    min: -30,  max: 30,   step: 1,    label: 'Shades Jump X (right)' },
+  shadesJumpYR:  { value: 22,   min: 0,    max: 60,   step: 1,    label: 'Shades Jump Y (right)' },
+  shadesSwimXL:  { value: 9,    min: -30,  max: 30,   step: 1,    label: 'Shades Swim X (left)' },
+  shadesSwimYL:  { value: 24,   min: 0,    max: 60,   step: 1,    label: 'Shades Swim Y (left)' },
+  shadesSwimXR:  { value: 9,    min: -30,  max: 30,   step: 1,    label: 'Shades Swim X (right)' },
+  shadesSwimYR:  { value: 24,   min: 0,    max: 60,   step: 1,    label: 'Shades Swim Y (right)' },
 };
 
 // S.gravity instead of settings.gravity.value

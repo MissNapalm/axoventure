@@ -100,8 +100,10 @@ function updateRedEnemies() {
     if (e.hitFlash > 0) e.hitFlash--;
 
     // particles — life only; physics handled in draw
-    for (const p of e.particles) p.life--;
-    e.particles = e.particles.filter(p => p.life > 0);
+    for (let _pi = e.particles.length - 1; _pi >= 0; _pi--) {
+      e.particles[_pi].life--;
+      if (e.particles[_pi].life <= 0) e.particles.splice(_pi, 1);
+    }
 
     if (e.dead) {
       const dist = Math.abs((e.startX + e.w / 2) - (player.x + player.w / 2));
@@ -132,6 +134,7 @@ function updateRedEnemies() {
           screenShakeTimer = 6;
           player.carrying = null;
           player.killText = { text: 'THROW HIT!', timer: 50, x: e.x + e.w / 2, y: e.y - 12 };
+          registerKill();
           break;
         }
       }
@@ -168,6 +171,7 @@ function updateRedEnemies() {
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
           player.killText = { text: 'THROW HIT!', timer: 50, x: e.x + e.w / 2, y: e._y - 12 };
+          registerKill();
           break;
         }
       }
@@ -218,21 +222,11 @@ function updateRedEnemies() {
     if (e.x <= e.patrolLeft)        { e.x = e.patrolLeft;        e.vx =  Math.abs(e.vx); }
     if (e.x + e.w >= e.patrolRight) { e.x = e.patrolRight - e.w; e.vx = -Math.abs(e.vx); }
 
-    // contact with player: dashing/homing flips them, walking hurts Axo
-    if (!player.dashing && !player.groundDashing) {
+    // contact with player: dashing/homing handled elsewhere, walking hurts Axo (fury blocks damage)
+    if (!player.dashing && !player.groundDashing && !fury.active) {
       const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
       const oy = Math.min(player.y + player.h, e._y + e.h) - Math.max(player.y, e._y);
-      if (ox > 0 && oy > 0) {
-        // push player out
-        if (ox < oy) {
-          player.x += player.x + player.w / 2 < e.x + e.w / 2 ? -ox : ox;
-          player.vx = 0;
-        } else {
-          player.y += player.y + player.h / 2 < e._y + e.h / 2 ? -oy : oy;
-          player.vy = 0;
-        }
-        if (player.hurtTimer === 0) hurtPlayer();
-      }
+      if (ox > 0 && oy > 0 && player.hurtTimer === 0) hurtPlayer();
     }
   }
 }
@@ -357,9 +351,12 @@ function spawnDeathStars(e) {
 
 // ── Fish enemies ─────────────────────────────────────────────────────────────
 
+let _fishIdCounter = 0;
+
 function makeFish(x, y, swimLeft, swimRight) {
   return {
     fish: true,
+    _id: _fishIdCounter++,
     x, startX: x,
     y, startY: y,
     w: 20, h: 10,
@@ -377,6 +374,7 @@ function makeFish(x, y, swimLeft, swimRight) {
 function makeDartfish(x, y, swimLeft, swimRight) {
   return {
     fish: true, dart: true,
+    _id: _fishIdCounter++,
     x, startX: x,
     y, startY: y,
     w: 20, h: 10,
@@ -388,6 +386,10 @@ function makeDartfish(x, y, swimLeft, swimRight) {
     hitFlash: 0,
     deathFlash: 0,
     particles: [],
+    dartTimer: 0,        // cooldown between lunges
+    darting: false,      // true during lunge
+    dartVx: 0, dartVy: 0,
+    dartProximity: 0,    // frames player has been close — triggers aggro at 180
   };
 }
 
@@ -421,12 +423,16 @@ const fishEnemies = [
   // dartfish guarding the orange in the second pool
   makeDartfish(4530, 500, 4490, 4960),
   makeDartfish(4820, 520, 4490, 4960),
+  makeDartfish(4650, 620, 4490, 4960),
+  makeDartfish(4750, 400, 4490, 4960),
 ];
 
 function updateFish() {
   for (const e of fishEnemies) {
-    for (const p of e.particles) p.life--;
-    e.particles = e.particles.filter(p => p.life > 0);
+    for (let _pi = e.particles.length - 1; _pi >= 0; _pi--) {
+      e.particles[_pi].life--;
+      if (e.particles[_pi].life <= 0) e.particles.splice(_pi, 1);
+    }
 
     if (e.hitFlash > 0) e.hitFlash--;
     if (e.deathFlash > 0) e.deathFlash--;
@@ -438,6 +444,7 @@ function updateFish() {
         e.vx = e.dart ? 2.2 : 0.7; e.vy = 0;
         e.hp = 1; e.dead = false;
         e.hitFlash = 0; e.deathFlash = 0; e.particles = [];
+        if (e.dart) { e.darting = false; e.dartTimer = 0; e.dartVx = 0; e.dartVy = 0; e.dartProximity = 0; }
       }
       continue;
     }
@@ -447,10 +454,44 @@ function updateFish() {
     const waterSurface = (e.startX >= WATER_ZONE_2.x ? WATER_ZONE_2.y : WATER_ZONE.y) + e.h + 2;
     e.y = Math.max(waterSurface, e.startY + Math.sin(e.bobPhase) * 8);
 
-    // horizontal patrol
+    // dartfish lunge at player when in water and close
+    if (e.dart) {
+      if (e.dartTimer > 0) e.dartTimer--;
+      if (e.darting) {
+        e.x += e.dartVx;
+        e.y += e.dartVy;
+        e.dartVx *= 0.88; e.dartVy *= 0.88;
+        if (Math.abs(e.dartVx) < 0.4 && Math.abs(e.dartVy) < 0.4) {
+          e.darting = false;
+          e.dartTimer = 90;
+          e.vx = e.x + e.w / 2 < (e.swimLeft + e.swimRight) / 2 ? 2.2 : -2.2;
+        }
+      } else if (e.dartTimer === 0 && player.inWater) {
+        const dx = (player.x + player.w / 2) - (e.x + e.w / 2);
+        const dy = (player.y + player.h / 2) - (e.y + e.h / 2);
+        const dist = Math.hypot(dx, dy);
+        if (dist < 120) {
+          e.dartProximity++;
+          // lunge immediately if close, or after 3s of proximity anywhere in range
+          if (dist < 60 || e.dartProximity >= 180) {
+            e.dartProximity = 0;
+            const nx = dx / dist, ny = dy / dist;
+            e.darting = true;
+            e.dartVx = nx * 11;
+            e.dartVy = ny * 11;
+          }
+        } else {
+          e.dartProximity = 0;
+        }
+      }
+    }
+
+    // horizontal patrol (skip if darting)
+    if (!e.dart || !e.darting) {
     e.x += e.vx;
     if (e.x <= e.swimLeft)             { e.x = e.swimLeft;         e.vx =  Math.abs(e.vx); }
     if (e.x + e.w >= e.swimRight)      { e.x = e.swimRight - e.w;  e.vx = -Math.abs(e.vx); }
+    }
     // wall collision against solid platforms
     for (const p of platforms) {
       if (p.oneWay) continue;
@@ -463,8 +504,8 @@ function updateFish() {
       }
     }
 
-    // hurt player on contact unless dashing/homing/dead
-    if (!e.dead && !player.dashing && !player.groundDashing && player.hurtTimer === 0 && player.postDashTimer === 0) {
+    // hurt player on contact unless homing/dead
+    if (!e.dead && !player.dashing && player.hurtTimer === 0 && player.postDashTimer === 0) {
       const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
       const oy = Math.min(player.y + player.h, e.y + e.h) - Math.max(player.y, e.y);
       if (ox > 0 && oy > 0) hurtPlayer();
@@ -492,7 +533,7 @@ function drawFish() {
 
     // build normal fish canvas once per fish object
     if (!e._oc) {
-      e._oc = getOC('fish_px_' + fishEnemies.indexOf(e), e.w, e.h);
+      e._oc = getOC('fish_px_' + e._id, e.w, e.h);
       const d = e._oc._ctx.createImageData(e.w, e.h);
       const px = d.data;
       const B = [40,160,200,255], F = [60,200,230,255], T = [20,110,160,255];
@@ -523,7 +564,7 @@ function drawFish() {
 
     ctx.imageSmoothingEnabled = false;
     if (flashColor > 0 && e._oc) {
-      const woc = getOC('fish_flash_' + fishEnemies.indexOf(e), e.w, e.h);
+      const woc = getOC('fish_flash_' + e._id, e.w, e.h);
       woc._ctx.clearRect(0, 0, e.w, e.h);
       woc._ctx.drawImage(e._oc, 0, 0);
       woc._ctx.globalCompositeOperation = 'source-atop';
@@ -543,16 +584,55 @@ function drawFish() {
 const combo = {
   count: 0,
   timer: 0,
-  WINDOW: 180, // frames to keep combo alive after a kill
+  WINDOW: 120, // frames to keep combo alive after a kill
   displayTimer: 0, // how long to show the final count after it expires
   peak: 0,
 };
+
+// ── Fury meter ────────────────────────────────────────────────────────────────
+const FURY_MAX       = 20;  // kills needed to fill
+const FURY_DURATION  = 600; // frames fury lasts at full (10 sec @ 60fps)
+
+const fury = {
+  kills:    0,     // current fill (0–FURY_MAX)
+  active:   false,
+  timer:    0,     // counts down while active
+  ready:    false, // meter full, waiting for F
+  flashTimer: 0,   // internal counter for white flash cycle
+};
+
+function isFuryActive() { return fury.active; }
+
+function activateFury() {
+  fury.active  = true;
+  fury.ready   = false;
+  fury.kills   = FURY_MAX;
+  fury.timer   = S.furyDuration;
+  fury.flashTimer = 0;
+}
+
+function updateFury() {
+  if (fury.active) {
+    fury.timer--;
+    fury.flashTimer++;
+    if (fury.timer <= 0) {
+      fury.active = false;
+      fury.kills  = 0;
+      fury.timer  = 0;
+    }
+  }
+}
 
 function registerKill() {
   combo.count++;
   combo.timer = combo.WINDOW;
   combo.displayTimer = 0;
   if (combo.count > combo.peak) combo.peak = combo.count;
+
+  if (!fury.active && !fury.ready && fury.kills < FURY_MAX) {
+    fury.kills = Math.min(FURY_MAX, fury.kills + S.furyKillFill);
+    if (fury.kills >= FURY_MAX) fury.ready = true;
+  }
 }
 
 function updateCombo() {
@@ -571,7 +651,7 @@ function updateCombo() {
 }
 
 function hitFish(e) {
-  e.hp--;
+  if (fury.active) e.hp = 0; else e.hp--;
   e.hitFlash = HIT_FLASH_FRAMES;
   if (e.hp <= 0) {
     e.deathFlash = 5;
@@ -649,12 +729,18 @@ const bigFishEnemies = [
   makeBigFish(2300, 500, 2170, 2450),
   makeBigFish(2650, 370, 2500, 2800),
   makeBigFish(3000, 480, 2860, 3150),
+  // second pool (x:4480–4980)
+  makeBigFish(4560, 450, 4490, 4960),
+  makeBigFish(4780, 550, 4490, 4960),
+  makeBigFish(4670, 650, 4490, 4960),
 ];
 
 function updateBigFish() {
   for (const e of bigFishEnemies) {
-    for (const p of e.particles) p.life--;
-    e.particles = e.particles.filter(p => p.life > 0);
+    for (let _pi = e.particles.length - 1; _pi >= 0; _pi--) {
+      e.particles[_pi].life--;
+      if (e.particles[_pi].life <= 0) e.particles.splice(_pi, 1);
+    }
 
     if (e.deathFlash > 0) e.deathFlash--;
     if (e.hitFlash > 0) e.hitFlash--;
@@ -877,7 +963,7 @@ function drawBigFish() {
 
     // warning exclamation during windup
     if (isWindup) {
-      const pulse = Math.floor(Date.now() / 120) % 2 === 0;
+      const pulse = Math.floor(frameNow / 120) % 2 === 0;
       if (pulse) {
         ctx.save();
         ctx.font = PIXEL_FONT;
@@ -891,7 +977,7 @@ function drawBigFish() {
 }
 
 function damageBigFish(e, impactX, impactY, text, bounceBack) {
-  e.hp--;
+  if (fury.active) e.hp = 0; else e.hp--;
   e.hitFlash = HIT_FLASH_FRAMES;
   hitFreezeTimer = HIT_FREEZE_FRAMES;
   spawnImpactVFX(impactX, impactY);
@@ -929,8 +1015,8 @@ function hitBigFishByDash(e, ex, ey) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function hitEnemy(e) {
-  if (e.stunTimer > 0) return; // invincible only during full spike mode, not the windup shake
-  e.hp--;
+  if (e.stunTimer > 0 && !fury.active) return; // invincible during spike mode unless fury is on
+  if (fury.active) e.hp = 0; else e.hp--;
   e.hitFlash = HIT_FLASH_FRAMES;
   e.hitTextTimer = 40;
   e.vx = (e.x + e.w / 2 > player.x + player.w / 2) ? 4 : -4;
@@ -941,6 +1027,7 @@ function hitEnemy(e) {
     triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
     screenShakeTimer = 6;
     if (player.dashing || player.groundDashing) player.killSpin = 10;
+    registerKill();
   } else {
     e.shakeTimer = 30;
   }
@@ -949,8 +1036,10 @@ function hitEnemy(e) {
 function updateEnemies() {
   for (const e of enemies) {
     // particles — life only; physics handled in draw
-    for (const p of e.particles) p.life--;
-    e.particles = e.particles.filter(p => p.life > 0);
+    for (let _pi = e.particles.length - 1; _pi >= 0; _pi--) {
+      e.particles[_pi].life--;
+      if (e.particles[_pi].life <= 0) e.particles.splice(_pi, 1);
+    }
 
     if (e.hitTextTimer > 0) e.hitTextTimer--;
     if (e.deathFlash > 0) e.deathFlash--;
@@ -981,6 +1070,12 @@ function updateEnemies() {
       if (e.stunTimer === 0) {
         e.vx = e.vx >= 0 ? e.patrolSpeed : -e.patrolSpeed;
       }
+      // contact during spike mode — fury blocks damage, otherwise hurts player
+      if (!player.dashing && !player.groundDashing && !fury.active) {
+        const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
+        const oy = Math.min(player.y + player.h, e.y + e.h) - Math.max(player.y, e.y);
+        if (ox > 0 && oy > 0 && player.hurtTimer === 0) hurtPlayer();
+      }
       continue;
     }
 
@@ -991,23 +1086,23 @@ function updateEnemies() {
     e.frameTimer++;
     if (e.frameTimer >= 10) { e.frameTimer = 0; e.frame = (e.frame + 1) % 2; }
 
-    // hurt player on contact unless dashing or homing
-    if (!player.dashing && !player.groundDashing && player.hurtTimer === 0) {
+    // hurt player on contact unless dashing, homing, or fury
+    if (!player.dashing && !player.groundDashing && !fury.active) {
       const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
       const oy = Math.min(player.y + player.h, e.y + e.h) - Math.max(player.y, e.y);
-      if (ox > 0 && oy > 0) hurtPlayer();
+      if (ox > 0 && oy > 0 && player.hurtTimer === 0) hurtPlayer();
     }
   }
 }
 
 function drawParticles(particles) {
+  if (!particles.length) return;
+  const prevAlpha = ctx.globalAlpha;
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
-    const alpha = p.life / p.maxLife;
+    ctx.globalAlpha = p.life / p.maxLife;
     const sx = Math.round(p.x - cameraX);
     const sy = Math.round(p.y - cameraY);
-    ctx.save();
-    ctx.globalAlpha = alpha;
     if (p.kind === 'circle') {
       p.r += p.speed;
       ctx.strokeStyle = '#ffffff';
@@ -1026,12 +1121,12 @@ function drawParticles(particles) {
     } else {
       ctx.fillStyle = p.color || '#ffffff';
       const s = p.size || 2;
-      ctx.fillRect(sx - (s / 2 | 0), sy - (s / 2 | 0), s, s);
+      ctx.fillRect(sx - (s >> 1), sy - (s >> 1), s, s);
       if (p.gravity) p.vy += p.gravity;
       p.x += p.vx; p.y += p.vy;
     }
-    ctx.restore();
   }
+  ctx.globalAlpha = prevAlpha;
 }
 
 function drawEnemies() {
@@ -1072,7 +1167,7 @@ function drawEnemies() {
         oc2d.drawImage(spr, 0, 0, e.w, e.h);
       }
       oc2d.globalCompositeOperation = 'source-atop';
-      oc2d.fillStyle = e.deathFlash > 0 ? 'rgba(255,255,255,1)' : `rgba(255,255,255,${e.hitFlash / HIT_FLASH_FRAMES})`;
+      oc2d.fillStyle = e.deathFlash > 0 ? 'rgba(255,255,255,1)' : 'rgba(255,255,255,' + (e.hitFlash / HIT_FLASH_FRAMES) + ')';
       oc2d.fillRect(0, 0, e.w, e.h);
       oc2d.globalCompositeOperation = 'source-over';
       ctx.drawImage(oc, drawX, sy);
