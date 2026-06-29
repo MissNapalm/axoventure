@@ -1003,19 +1003,17 @@ function drawPlayer() {
     const len = Math.hypot(dx, dy) || 1;
     const nx = dx / len; const ny = dy / len;
     const prevAlpha = ctx.globalAlpha;
-    ctx.strokeStyle = '#c0f0ff';
-    ctx.lineWidth = 1;
+    ctx.fillStyle = '#c0f0ff';
     for (let i = 0; i < 5; i++) {
       const spread = (i - 2) * 4;
       const ox = -ny * spread; const oy = nx * spread;
-      const sx = newest.x - cameraX + ox;
-      const sy = newest.y - cameraY + oy;
+      const bx = newest.x - cameraX + ox;
+      const by = newest.y - cameraY + oy;
       const lineLen = 10 + i * 3;
       ctx.globalAlpha = 0.55 - i * 0.08;
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(sx - nx * lineLen, sy - ny * lineLen);
-      ctx.stroke();
+      for (let d = 2; d < lineLen; d += 3) {
+        ctx.fillRect(Math.round(bx - nx * d), Math.round(by - ny * d), 1, 1);
+      }
     }
     ctx.globalAlpha = prevAlpha;
   }
@@ -1049,31 +1047,24 @@ function drawPlayer() {
     ctx.globalAlpha = prevAlpha;
   }
 
-  // sparks — pixel boxes and streak lines
+  // sparks — pixel boxes only (no stroke), globalAlpha quantized to 4 levels
   {
     const prevAlpha = ctx.globalAlpha;
+    let _lastAlpha = -1;
+    ctx.fillStyle = '#ffffff';
     for (let i = player.sparks.length - 1; i >= 0; i--) {
       const sp = player.sparks[i];
       sp.life--;
       if (sp.life <= 0) { player.sparks.splice(i, 1); continue; }
       if (sp.gravity) sp.vy += sp.gravity;
-      ctx.globalAlpha = sp.life / sp.maxLife;
+      const frac = sp.life / sp.maxLife;
+      const alpha = frac > 0.75 ? 1 : frac > 0.5 ? 0.7 : frac > 0.25 ? 0.4 : 0.15;
+      if (alpha !== _lastAlpha) { ctx.globalAlpha = alpha; _lastAlpha = alpha; }
       const sx = Math.round(sp.x - cameraX);
       const sy = Math.round(sp.y - cameraY);
-      if (sp.kind === 'box') {
-        ctx.fillStyle = sp.color || '#ffffff';
-        const s = sp.size || 2;
-        ctx.fillRect(sx - (s >> 1), sy - (s >> 1), s, s);
-        sp.x += sp.vx; sp.y += sp.vy;
-      } else {
-        ctx.strokeStyle = sp.color || '#ffffff';
-        ctx.lineWidth = sp.size || 1.5;
-        ctx.beginPath();
-        ctx.moveTo(sx, sy);
-        sp.x += sp.vx; sp.y += sp.vy;
-        ctx.lineTo(Math.round(sp.x - cameraX), Math.round(sp.y - cameraY));
-        ctx.stroke();
-      }
+      const s = sp.size || 2;
+      ctx.fillRect(sx - (s >> 1), sy - (s >> 1), s, s);
+      sp.x += sp.vx; sp.y += sp.vy;
     }
     ctx.globalAlpha = prevAlpha;
   }

@@ -368,6 +368,7 @@ function makeFish(x, y, swimLeft, swimRight) {
     hitFlash: 0,
     deathFlash: 0,
     particles: [],
+    respawnTimer: 0,
   };
 }
 
@@ -390,6 +391,7 @@ function makeDartfish(x, y, swimLeft, swimRight) {
     darting: false,      // true during lunge
     dartVx: 0, dartVy: 0,
     dartProximity: 0,    // frames player has been close — triggers aggro at 180
+    respawnTimer: 0,
   };
 }
 
@@ -438,21 +440,28 @@ function updateFish() {
     if (e.deathFlash > 0) e.deathFlash--;
 
     if (e.dead) {
-      // respawn when player moves away
-      if (Math.abs(e.startX - (player.x + player.w / 2)) > VIEW_W) {
+      if (e.respawnTimer > 0) { e.respawnTimer--; continue; }
+      const distFromPlayer = Math.abs(e.startX - (player.x + player.w / 2));
+      if (distFromPlayer > VIEW_W) {
         e.x = e.startX; e.y = e.startY;
         e.vx = e.dart ? 2.2 : 0.7; e.vy = 0;
         e.hp = 1; e.dead = false;
         e.hitFlash = 0; e.deathFlash = 0; e.particles = [];
         if (e.dart) { e.darting = false; e.dartTimer = 0; e.dartVx = 0; e.dartVy = 0; e.dartProximity = 0; }
+        e.respawnTimer = 0;
       }
       continue;
     }
 
-    // sine-wave bob — clamp so fish never breach the water surface
+    // clamp fish to their water zone at all times
     e.bobPhase += 0.05;
-    const waterSurface = (e.startX >= WATER_ZONE_2.x ? WATER_ZONE_2.y : WATER_ZONE.y) + e.h + 2;
-    e.y = Math.max(waterSurface, e.startY + Math.sin(e.bobPhase) * 8);
+    const inZone2 = e.startX >= WATER_ZONE_2.x;
+    const wz = inZone2 ? WATER_ZONE_2 : WATER_ZONE;
+    const wzFloor = wz.y + wz.h;
+    const waterSurface = wz.y + e.h + 2;
+    const waterFloor   = wzFloor - e.h - 2;
+    e.y = Math.max(waterSurface, Math.min(waterFloor, e.startY + Math.sin(e.bobPhase) * 8));
+    e.x = Math.max(wz.x, Math.min(wz.x + wz.w - e.w, e.x));
 
     // dartfish lunge at player when in water and close
     if (e.dart) {
@@ -460,6 +469,8 @@ function updateFish() {
       if (e.darting) {
         e.x += e.dartVx;
         e.y += e.dartVy;
+        e.x = Math.max(wz.x, Math.min(wz.x + wz.w - e.w, e.x));
+        e.y = Math.max(waterSurface, Math.min(waterFloor, e.y));
         e.dartVx *= 0.88; e.dartVy *= 0.88;
         if (Math.abs(e.dartVx) < 0.4 && Math.abs(e.dartVy) < 0.4) {
           e.darting = false;
@@ -656,6 +667,7 @@ function hitFish(e) {
   if (e.hp <= 0) {
     e.deathFlash = 5;
     e.dead = true;
+    e.respawnTimer = e.dart ? 300 : 180;
     spawnDeathStars(e);
     triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
     screenShakeTimer = 6;
@@ -666,6 +678,7 @@ function hitFish(e) {
 
 function hitFishByHoming(e, impactX, impactY) {
   e.dead = true;
+  e.respawnTimer = e.dart ? 300 : 180;
   e.deathFlash = 5;
   spawnDeathStars(e);
   triggerLightning(Math.round(impactX - cameraX));
@@ -681,6 +694,7 @@ function hitFishByHoming(e, impactX, impactY) {
 
 function hitFishByDash(e, ex, ey) {
   e.dead = true;
+  if (e.dart) e.respawnTimer = 300;
   e.deathFlash = 5;
   spawnDeathStars(e);
   triggerLightning(Math.round(ex - cameraX));
@@ -720,6 +734,7 @@ function makeBigFish(x, y, swimLeft, swimRight) {
     deathFlash: 0,
     hitFlash: 0,
     proximityTimer: 0,
+    contactTimer: 0,
     particles: [],
   };
 }
@@ -745,11 +760,14 @@ function updateBigFish() {
     if (e.deathFlash > 0) e.deathFlash--;
     if (e.hitFlash > 0) e.hitFlash--;
 
+    if (e.contactTimer > 0) e.contactTimer--;
+
     if (e.dead) {
-      if (Math.abs(e.startX - (player.x + player.w / 2)) > VIEW_W) {
+      const distFromPlayer = Math.abs(e.startX - (player.x + player.w / 2));
+      if (distFromPlayer > VIEW_W) {
         e.x = e.startX; e.y = e.startY;
         e.vx = 0.5; e.vy = 0;
-        e.hp = 3; e.dead = false; e.deathFlash = 0; e.hitFlash = 0; e.proximityTimer = 0;
+        e.hp = 3; e.dead = false; e.deathFlash = 0; e.hitFlash = 0; e.proximityTimer = 0; e.contactTimer = 0;
         e.state = 'patrol'; e.stateTimer = 0; e.particles = [];
         e.bobPhase = Math.random() * Math.PI * 2;
       }
@@ -762,12 +780,18 @@ function updateBigFish() {
     const ecy = e.y + e.h / 2;
     const dist = Math.hypot(pcx - ecx, pcy - ecy);
 
+    const bfInZone2 = e.startX >= WATER_ZONE_2.x;
+    const bfWz = bfInZone2 ? WATER_ZONE_2 : WATER_ZONE;
+    const bfSurface = bfWz.y + e.h + 2;
+    const bfFloor   = bfWz.y + bfWz.h - e.h - 2;
+
     if (e.state === 'patrol') {
       e.bobPhase += 0.04;
-      e.y = e.startY + Math.sin(e.bobPhase) * 10;
+      e.y = Math.max(bfSurface, Math.min(bfFloor, e.startY + Math.sin(e.bobPhase) * 10));
       e.x += e.vx;
       if (e.x <= e.swimLeft)           { e.x = e.swimLeft;         e.vx =  Math.abs(e.vx); }
       if (e.x + e.w >= e.swimRight)    { e.x = e.swimRight - e.w;  e.vx = -Math.abs(e.vx); }
+      e.x = Math.max(bfWz.x, Math.min(bfWz.x + bfWz.w - e.w, e.x));
 
       // aggro if player stays close for 3 seconds (180 frames)
       if (player.inWater && dist < PATROL_TRIGGER_DIST) {
@@ -801,6 +825,8 @@ function updateBigFish() {
     } else if (e.state === 'rush') {
       e.x += e.rushVx;
       e.y += e.rushVy;
+      e.x = Math.max(bfWz.x, Math.min(bfWz.x + bfWz.w - e.w, e.x));
+      e.y = Math.max(bfSurface, Math.min(bfFloor, e.y));
       e.stateTimer--;
 
       // contact during rush always hurts — player must dash away
@@ -841,18 +867,11 @@ function updateBigFish() {
       }
     }
 
-    // contact during patrol: push player out so they can't clip through
-    if (e.state === 'patrol' && !player.dashing && !player.groundDashing) {
+    // contact hurts in any state — brief grace after homing hit, then vulnerable
+    if (!player.dashing && e.contactTimer === 0) {
       const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
       const oy = Math.min(player.y + player.h, e.y + e.h) - Math.max(player.y, e.y);
       if (ox > 0 && oy > 0) {
-        if (ox < oy) {
-          player.x += player.x + player.w / 2 < e.x + e.w / 2 ? -ox : ox;
-          player.vx = 0;
-        } else {
-          player.y += player.y + player.h / 2 < e.y + e.h / 2 ? -oy : oy;
-          player.vy = 0;
-        }
         if (player.hurtTimer === 0) hurtPlayer();
       }
     }
@@ -882,22 +901,17 @@ function drawBigFish() {
     ctx.rotate(rushAngle);
     if (!facingRight) ctx.scale(-1, 1);
 
-    // rush: motion lines behind fish
+    // rush: motion lines behind fish (fillRect, no stroke)
     if (isRush) {
-      ctx.save();
-      ctx.strokeStyle = '#ff6600';
-      ctx.lineWidth = 1;
+      ctx.fillStyle = '#ff6600';
       for (let i = 0; i < 4; i++) {
-        const lx = -W * 0.5 - i * 4;
-        const ly = -H * 0.3 + i * (H * 0.2);
+        const lx = Math.round(-W * 0.5 - i * 4);
+        const ly = Math.round(-H * 0.3 + i * (H * 0.2));
         const len = 4 + i * 2;
         ctx.globalAlpha = 0.7 - i * 0.15;
-        ctx.beginPath();
-        ctx.moveTo(lx, ly);
-        ctx.lineTo(lx - len, ly);
-        ctx.stroke();
+        ctx.fillRect(lx - len, ly, len, 1);
       }
-      ctx.restore();
+      ctx.globalAlpha = 1;
     }
 
     // SNES-style pixel fish — pre-rendered per state variant
@@ -1004,6 +1018,7 @@ function damageBigFish(e, impactX, impactY, text, bounceBack) {
 
 function hitBigFishByHoming(e, impactX, impactY) {
   if (e.state === 'windup' || e.state === 'rush') return;
+  e.contactTimer = 20;
   damageBigFish(e, impactX, impactY, 'HOMING HIT!', true);
 }
 
@@ -1098,28 +1113,21 @@ function updateEnemies() {
 function drawParticles(particles) {
   if (!particles.length) return;
   const prevAlpha = ctx.globalAlpha;
+  let _lastAlpha = -1;
+  ctx.fillStyle = '#ffffff';
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
-    ctx.globalAlpha = p.life / p.maxLife;
+    const frac = p.life / p.maxLife;
+    const alpha = frac > 0.75 ? 1 : frac > 0.5 ? 0.7 : frac > 0.25 ? 0.4 : 0.15;
+    if (alpha !== _lastAlpha) { ctx.globalAlpha = alpha; _lastAlpha = alpha; }
     const sx = Math.round(p.x - cameraX);
     const sy = Math.round(p.y - cameraY);
+    // all particle kinds rendered as fillRect — no stroke/arc to keep Chrome fast
     if (p.kind === 'circle') {
       p.r += p.speed;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(sx, sy, p.r, 0, Math.PI * 2);
-      ctx.stroke();
-    } else if (p.kind === 'line') {
-      ctx.strokeStyle = p.color || '#ffffff';
-      ctx.lineWidth = p.size || 1.5;
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      p.x += p.vx; p.y += p.vy;
-      ctx.lineTo(Math.round(p.x - cameraX), Math.round(p.y - cameraY));
-      ctx.stroke();
+      const r = Math.round(p.r);
+      ctx.fillRect(sx - r, sy - r, r * 2, r * 2);
     } else {
-      ctx.fillStyle = p.color || '#ffffff';
       const s = p.size || 2;
       ctx.fillRect(sx - (s >> 1), sy - (s >> 1), s, s);
       if (p.gravity) p.vy += p.gravity;
