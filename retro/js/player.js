@@ -158,6 +158,10 @@ function resolveCollisions() {
         player.vy = 0;
         player.onGround = true;
       }
+    } else if (player.inWater && player.groundDashing) {
+      // underwater dash — push out of walls but don't zero velocity or set onGround
+      if (ox < oy) { if (player.x < p.x) player.x -= ox; else player.x += ox; }
+      else { if (player.y < p.y) player.y -= oy; else player.y += oy; }
     } else {
       if (ox < oy) {
         if (player.x < p.x) player.x -= ox; else player.x += ox;
