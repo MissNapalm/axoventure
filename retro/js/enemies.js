@@ -380,28 +380,6 @@ function makeFish(x, y, swimLeft, swimRight) {
   };
 }
 
-function makeDartfish(x, y, swimLeft, swimRight) {
-  return {
-    fish: true, dart: true,
-    _id: _fishIdCounter++,
-    x, startX: x,
-    y, startY: y,
-    w: 20, h: 10,
-    vx: 2.2, vy: 0,
-    swimLeft, swimRight,
-    bobPhase: Math.random() * Math.PI * 2,
-    hp: 1,
-    dead: false,
-    hitFlash: 0,
-    deathFlash: 0,
-    particles: [],
-    dartTimer: 0,        // cooldown between lunges
-    darting: false,      // true during lunge
-    dartVx: 0, dartVy: 0,
-    dartProximity: 0,    // frames player has been close — triggers aggro at 180
-    respawnTimer: 0,
-  };
-}
 
 const fishEnemies = [
   makeFish(1900, 380, 1800, 2000),
@@ -430,11 +408,7 @@ const fishEnemies = [
   makeFish(4860, 450, 4490, 4960),
   makeFish(4560, 600, 4490, 4960),
   makeFish(4880, 550, 4490, 4960),
-  // dartfish guarding the orange in the second pool
-  makeDartfish(4530, 500, 4490, 4960),
-  makeDartfish(4820, 520, 4490, 4960),
-  makeDartfish(4650, 620, 4490, 4960),
-  makeDartfish(4750, 400, 4490, 4960),
+
 ];
 
 function updateFish() {
@@ -445,7 +419,7 @@ function updateFish() {
     if (e.deathFlash > 0) e.deathFlash--;
 
     if (e.dead) {
-      if (e.dart) { continue; } // dartfish never respawn
+
       if (e.respawnTimer > 0) { e.respawnTimer--; continue; }
       const distFromPlayer = Math.abs(e.startX - (player.x + player.w / 2));
       if (distFromPlayer > VIEW_W) {
@@ -468,42 +442,8 @@ function updateFish() {
     e.y = Math.max(waterSurface, Math.min(waterFloor, e.startY + Math.sin(e.bobPhase) * 8));
     e.x = Math.max(wz.x, Math.min(wz.x + wz.w - e.w, e.x));
 
-    // dartfish lunge at player when in water and close
-    if (e.dart) {
-      if (e.dartTimer > 0) e.dartTimer--;
-      if (e.darting) {
-        e.x += e.dartVx;
-        e.y += e.dartVy;
-        e.x = Math.max(wz.x, Math.min(wz.x + wz.w - e.w, e.x));
-        e.y = Math.max(waterSurface, Math.min(waterFloor, e.y));
-        e.dartVx *= 0.88; e.dartVy *= 0.88;
-        if (Math.abs(e.dartVx) < 0.4 && Math.abs(e.dartVy) < 0.4) {
-          e.darting = false;
-          e.dartTimer = 90;
-          e.vx = e.x + e.w / 2 < (e.swimLeft + e.swimRight) / 2 ? 2.2 : -2.2;
-        }
-      } else if (e.dartTimer === 0 && player.inWater) {
-        const dx = (player.x + player.w / 2) - (e.x + e.w / 2);
-        const dy = (player.y + player.h / 2) - (e.y + e.h / 2);
-        const dist = Math.hypot(dx, dy);
-        if (dist < 120) {
-          e.dartProximity++;
-          // lunge immediately if close, or after 3s of proximity anywhere in range
-          if (dist < 60 || e.dartProximity >= 180) {
-            e.dartProximity = 0;
-            const nx = dx / dist, ny = dy / dist;
-            e.darting = true;
-            e.dartVx = nx * 11;
-            e.dartVy = ny * 11;
-          }
-        } else {
-          e.dartProximity = 0;
-        }
-      }
-    }
-
-    // horizontal patrol (skip if darting)
-    if (!e.dart || !e.darting) {
+    // horizontal patrol
+    {
     e.x += e.vx;
     if (e.x <= e.swimLeft)             { e.x = e.swimLeft;         e.vx =  Math.abs(e.vx); }
     if (e.x + e.w >= e.swimRight)      { e.x = e.swimRight - e.w;  e.vx = -Math.abs(e.vx); }
@@ -672,7 +612,7 @@ function hitFish(e) {
   if (e.hp <= 0) {
     e.deathFlash = 5;
     e.dead = true;
-    e.respawnTimer = e.dart ? 300 : 180;
+    e.respawnTimer = 180;
     spawnDeathStars(e);
     triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
     screenShakeTimer = 6;
@@ -683,7 +623,7 @@ function hitFish(e) {
 
 function hitFishByHoming(e, impactX, impactY) {
   e.dead = true;
-  e.respawnTimer = e.dart ? 300 : 180;
+  e.respawnTimer = 180;
   e.deathFlash = 5;
   spawnDeathStars(e);
   triggerLightning(Math.round(impactX - cameraX));
@@ -699,7 +639,7 @@ function hitFishByHoming(e, impactX, impactY) {
 
 function hitFishByDash(e, ex, ey) {
   e.dead = true;
-  if (e.dart) e.respawnTimer = 300;
+  e.respawnTimer = 180;
   e.deathFlash = 5;
   spawnDeathStars(e);
   triggerLightning(Math.round(ex - cameraX));

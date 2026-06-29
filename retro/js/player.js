@@ -93,7 +93,6 @@ function resetLevel() {
   }
   // reset fish
   for (const e of fishEnemies) {
-    if (e.dart) continue; // dartfish never respawn, even on reset
     e.x = e.startX; e.y = e.startY;
     e.vx = 0.7; e.vy = 0;
     e.hp = 1; e.dead = false;
