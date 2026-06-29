@@ -100,10 +100,7 @@ function updateRedEnemies() {
     if (e.hitFlash > 0) e.hitFlash--;
 
     // particles — life only; physics handled in draw
-    for (let _pi = e.particles.length - 1; _pi >= 0; _pi--) {
-      e.particles[_pi].life--;
-      if (e.particles[_pi].life <= 0) e.particles.splice(_pi, 1);
-    }
+    { let _pn = 0; for (let _pi = 0; _pi < e.particles.length; _pi++) { e.particles[_pi].life--; if (e.particles[_pi].life > 0) e.particles[_pn++] = e.particles[_pi]; } e.particles.length = _pn; }
 
     if (e.dead) {
       const dist = Math.abs((e.startX + e.w / 2) - (player.x + player.w / 2));
@@ -431,10 +428,7 @@ const fishEnemies = [
 
 function updateFish() {
   for (const e of fishEnemies) {
-    for (let _pi = e.particles.length - 1; _pi >= 0; _pi--) {
-      e.particles[_pi].life--;
-      if (e.particles[_pi].life <= 0) e.particles.splice(_pi, 1);
-    }
+    { let _pn = 0; for (let _pi = 0; _pi < e.particles.length; _pi++) { e.particles[_pi].life--; if (e.particles[_pi].life > 0) e.particles[_pn++] = e.particles[_pi]; } e.particles.length = _pn; }
 
     if (e.hitFlash > 0) e.hitFlash--;
     if (e.deathFlash > 0) e.deathFlash--;
@@ -752,10 +746,7 @@ const bigFishEnemies = [
 
 function updateBigFish() {
   for (const e of bigFishEnemies) {
-    for (let _pi = e.particles.length - 1; _pi >= 0; _pi--) {
-      e.particles[_pi].life--;
-      if (e.particles[_pi].life <= 0) e.particles.splice(_pi, 1);
-    }
+    { let _pn = 0; for (let _pi = 0; _pi < e.particles.length; _pi++) { e.particles[_pi].life--; if (e.particles[_pi].life > 0) e.particles[_pn++] = e.particles[_pi]; } e.particles.length = _pn; }
 
     if (e.deathFlash > 0) e.deathFlash--;
     if (e.hitFlash > 0) e.hitFlash--;
@@ -1051,10 +1042,7 @@ function hitEnemy(e) {
 function updateEnemies() {
   for (const e of enemies) {
     // particles — life only; physics handled in draw
-    for (let _pi = e.particles.length - 1; _pi >= 0; _pi--) {
-      e.particles[_pi].life--;
-      if (e.particles[_pi].life <= 0) e.particles.splice(_pi, 1);
-    }
+    { let _pn = 0; for (let _pi = 0; _pi < e.particles.length; _pi++) { e.particles[_pi].life--; if (e.particles[_pi].life > 0) e.particles[_pn++] = e.particles[_pi]; } e.particles.length = _pn; }
 
     if (e.hitTextTimer > 0) e.hitTextTimer--;
     if (e.deathFlash > 0) e.deathFlash--;
@@ -1115,14 +1103,15 @@ function drawParticles(particles) {
   const prevAlpha = ctx.globalAlpha;
   let _lastAlpha = -1;
   ctx.fillStyle = '#ffffff';
-  for (let i = particles.length - 1; i >= 0; i--) {
+  for (let i = 0; i < particles.length; i++) {
     const p = particles[i];
+    if (p.gravity) p.vy += p.gravity;
+    p.x += p.vx; p.y += p.vy;
     const frac = p.life / p.maxLife;
     const alpha = frac > 0.75 ? 1 : frac > 0.5 ? 0.7 : frac > 0.25 ? 0.4 : 0.15;
     if (alpha !== _lastAlpha) { ctx.globalAlpha = alpha; _lastAlpha = alpha; }
     const sx = Math.round(p.x - cameraX);
     const sy = Math.round(p.y - cameraY);
-    // all particle kinds rendered as fillRect — no stroke/arc to keep Chrome fast
     if (p.kind === 'circle') {
       p.r += p.speed;
       const r = Math.round(p.r);
@@ -1130,8 +1119,6 @@ function drawParticles(particles) {
     } else {
       const s = p.size || 2;
       ctx.fillRect(sx - (s >> 1), sy - (s >> 1), s, s);
-      if (p.gravity) p.vy += p.gravity;
-      p.x += p.vx; p.y += p.vy;
     }
   }
   ctx.globalAlpha = prevAlpha;

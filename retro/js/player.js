@@ -346,14 +346,7 @@ function updatePlayer() {
   if (player.onGround) { player.waterExitSpin = 0; player.dashedFromWater = false; }
 
   // bubble spawning from axo's mouth
-  for (let i = player.bubbles.length - 1; i >= 0; i--) {
-    const b = player.bubbles[i];
-    b.life--;
-    b.y -= b.rise;
-    b.x += Math.sin(b.wobble) * 0.4;
-    b.wobble += 0.12;
-    if (b.life <= 0) player.bubbles.splice(i, 1);
-  }
+  { let _bn = 0; for (let i = 0; i < player.bubbles.length; i++) { const b = player.bubbles[i]; b.life--; b.y -= b.rise; b.x += Math.sin(b.wobble) * 0.4; b.wobble += 0.12; if (b.life > 0) player.bubbles[_bn++] = b; } player.bubbles.length = _bn; }
   if (player.inWater) {
     player.swimBobPhase += 0.07;
     player.airDashUsed = false; // unlimited dash in water
@@ -524,11 +517,7 @@ function updatePlayer() {
   if (player.waterExitSpin > 0) player.waterExitSpin += 0.42; // ~1 rotation per 15 frames
 
   // update splash particles
-  for (let i = player.splash.length - 1; i >= 0; i--) {
-    const p = player.splash[i];
-    p.x += p.vx; p.y += p.vy; p.vy += p.gravity; p.life--;
-    if (p.life <= 0) player.splash.splice(i, 1);
-  }
+  { let _sn = 0; for (let i = 0; i < player.splash.length; i++) { const p = player.splash[i]; p.x += p.vx; p.y += p.vy; p.vy += p.gravity; p.life--; if (p.life > 0) player.splash[_sn++] = p; } player.splash.length = _sn; }
 
   // fury sparks — every 3 frames to keep particle count low
   if (fury.active && fury.flashTimer % 3 === 0) {
@@ -546,11 +535,13 @@ function updatePlayer() {
     });
   }
 
-  // fade trail
-  for (let i = player.trail.length - 1; i >= 0; i--) {
+  // fade trail — compact in place, no splice
+  let _tLen = 0;
+  for (let i = 0; i < player.trail.length; i++) {
     player.trail[i].life--;
-    if (player.trail[i].life <= 0) player.trail.splice(i, 1);
+    if (player.trail[i].life > 0) player.trail[_tLen++] = player.trail[i];
   }
+  player.trail.length = _tLen;
 
   if (!player.dashing && !player.groundDashing && player.homingWindup === 0 && !player.inWater) player.vy += S.gravity;
   player.x += player.vx;
@@ -1028,35 +1019,42 @@ function drawPlayer() {
     ctx.restore();
   }
 
-  // shockwave rings expanding outward from impact
+  // shockwave rings — drawn as 4 corner pixels at radius, no arc/stroke
   {
     const prevAlpha = ctx.globalAlpha;
-    for (let i = player.shockwaves.length - 1; i >= 0; i--) {
+    let _swn = 0;
+    ctx.fillStyle = '#ffffff';
+    for (let i = 0; i < player.shockwaves.length; i++) {
       const sw = player.shockwaves[i];
-      if (sw.delay > 0) { sw.delay--; continue; }
-      sw.life--;
-      sw.r += sw.speed;
-      if (sw.life <= 0) { player.shockwaves.splice(i, 1); continue; }
-      ctx.globalAlpha = (sw.life / sw.maxLife) * 0.9;
-      ctx.strokeStyle = sw.color;
-      ctx.lineWidth = sw.lw || 2;
-      ctx.beginPath();
-      ctx.arc(Math.round(sw.x - cameraX), Math.round(sw.y - cameraY), sw.r, 0, Math.PI * 2);
-      ctx.stroke();
+      if (sw.delay > 0) { sw.delay--; player.shockwaves[_swn++] = sw; continue; }
+      sw.life--; sw.r += sw.speed;
+      if (sw.life <= 0) continue;
+      player.shockwaves[_swn++] = sw;
+      const frac = (sw.life / sw.maxLife) * 0.9;
+      ctx.globalAlpha = frac > 0.66 ? 0.9 : frac > 0.33 ? 0.55 : 0.25;
+      const cx = Math.round(sw.x - cameraX), cy = Math.round(sw.y - cameraY), r = Math.round(sw.r);
+      const t = sw.lw || 2;
+      ctx.fillRect(cx - r - t, cy - t, r * 2 + t * 2, t); // top
+      ctx.fillRect(cx - r - t, cy,     r * 2 + t * 2, t); // bottom
+      ctx.fillRect(cx - r - t, cy - t, t, t * 2);         // left
+      ctx.fillRect(cx + r,     cy - t, t, t * 2);         // right
     }
+    player.shockwaves.length = _swn;
     ctx.globalAlpha = prevAlpha;
   }
 
   // sparks — pixel boxes only (no stroke), globalAlpha quantized to 4 levels
   {
     const prevAlpha = ctx.globalAlpha;
-    let _lastAlpha = -1;
+    let _lastAlpha = -1, _sLen = 0;
     ctx.fillStyle = '#ffffff';
-    for (let i = player.sparks.length - 1; i >= 0; i--) {
+    for (let i = 0; i < player.sparks.length; i++) {
       const sp = player.sparks[i];
       sp.life--;
-      if (sp.life <= 0) { player.sparks.splice(i, 1); continue; }
       if (sp.gravity) sp.vy += sp.gravity;
+      sp.x += sp.vx; sp.y += sp.vy;
+      if (sp.life <= 0) continue;
+      player.sparks[_sLen++] = sp;
       const frac = sp.life / sp.maxLife;
       const alpha = frac > 0.75 ? 1 : frac > 0.5 ? 0.7 : frac > 0.25 ? 0.4 : 0.15;
       if (alpha !== _lastAlpha) { ctx.globalAlpha = alpha; _lastAlpha = alpha; }
@@ -1064,8 +1062,8 @@ function drawPlayer() {
       const sy = Math.round(sp.y - cameraY);
       const s = sp.size || 2;
       ctx.fillRect(sx - (s >> 1), sy - (s >> 1), s, s);
-      sp.x += sp.vx; sp.y += sp.vy;
     }
+    player.sparks.length = _sLen;
     ctx.globalAlpha = prevAlpha;
   }
 
