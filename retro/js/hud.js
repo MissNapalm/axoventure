@@ -23,19 +23,19 @@ function drawHUD() {
   // frame time graph — 60 bars in bottom-right, each = one frame duration
   // 16.6ms = 60fps = bar height 5px; spike to 33ms = bar height 10px
   const GW = 62, GH = 20, GX = VIEW_W - GW - 2, GY = VIEW_H - GH - 2;
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillStyle = '#060210';
   ctx.fillRect(GX - 1, GY - 1, GW + 2, GH + 2);
+  let _prevColor = '';
   for (let i = 0; i < 60; i++) {
     const idx = (_frameIdx - 60 + i + 60) % 60;
     const dt = _frameTimes[idx];
     const barH = Math.min(GH, Math.round(dt / 33.3 * GH));
-    const good = dt <= 17;
-    const ok   = dt <= 25;
-    ctx.fillStyle = good ? '#00ff88' : ok ? '#ffaa00' : '#ff4444';
+    if (barH <= 0) continue;
+    const color = dt <= 17 ? '#00ff88' : dt <= 25 ? '#ffaa00' : '#ff4444';
+    if (color !== _prevColor) { ctx.fillStyle = color; _prevColor = color; }
     ctx.fillRect(GX + i, GY + GH - barH, 1, barH);
   }
-  // 16.6ms target line
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.fillStyle = '#444444';
   ctx.fillRect(GX, GY + GH - Math.round(GH / 2), GW, 1);
 
   // fps number
