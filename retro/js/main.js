@@ -9,6 +9,14 @@ let frameNow = 0;
 
 function loop() {
   frameNow = performance.now();
+
+  if (titleActive) {
+    updateTitleScreen();
+    drawTitleScreen();
+    requestAnimationFrame(loop);
+    return;
+  }
+
   if (levelComplete) {
     updateItems(); // keeps timer ticking
     ctx.clearRect(0, 0, VIEW_W, VIEW_H);
@@ -95,8 +103,10 @@ function loop() {
   let shakeX = 0, shakeY = 0;
   if (screenShakeTimer > 0) {
     screenShakeTimer--;
-    shakeX = (Math.random() * 2 - 1) * SCREEN_SHAKE_MAG;
-    shakeY = (Math.random() * 2 - 1) * SCREEN_SHAKE_MAG;
+    shakeX = (Math.random() * 2 - 1) * screenShakeMag;
+    shakeY = (Math.random() * 2 - 1) * screenShakeMag;
+    screenShakeMag = Math.max(SCREEN_SHAKE_MAG, screenShakeMag * 0.82);
+    if (screenShakeTimer === 0) screenShakeMag = SCREEN_SHAKE_MAG;
     ctx.save();
     ctx.translate(shakeX, shakeY);
   }

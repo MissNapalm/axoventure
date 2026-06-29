@@ -33,11 +33,14 @@ function openDialog(npc) {
   dialog.chars = 0;
   dialog.charTimer = 0;
   dialog._cachedPage = -1;
+  playSound('textletterloop');
 }
 
 function advanceDialog() {
   dialog.page++;
   if (dialog.page >= dialog.npc.lines.length) {
+    stopSound('textletterloop');
+    playSound('dialogdone');
     const closedNpc = dialog.npc;
     dialog.active = false;
     dialog.npc = null;
@@ -46,6 +49,7 @@ function advanceDialog() {
     dialog.chars = 0;
     dialog.charTimer = 0;
     dialog._cachedPage = -1;
+    playSound('textletterloop');
   }
 }
 
@@ -55,6 +59,7 @@ function tickDialog() {
   if (dialog.charTimer >= dialog.CHAR_INTERVAL) {
     dialog.charTimer = 0;
     dialog.chars++;
+    if (dialog.done) stopSound('textletterloop');
   }
 }
 

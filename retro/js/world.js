@@ -2,6 +2,7 @@ let cameraX = 0;
 let cameraY = 0;
 let hitFreezeTimer = 0;
 let screenShakeTimer = 0;
+let screenShakeMag = SCREEN_SHAKE_MAG; // can be overridden for big hits, decays per-frame
 
 // Mario-style death sequence
 const death = {
@@ -32,19 +33,19 @@ const platforms = [
   // fill the 20px notch where land meets water zone wall
   { x: 1700, y: 210, w: 40, h: 20, color: '#3d2b1f' },
   // floating platforms (original)
-  { x: 80,   y: 175, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 230,  y: 155, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 370,  y: 135, w: 70,  h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 500,  y: 165, w: 90,  h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 650,  y: 140, w: 75,  h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 790,  y: 115, w: 70,  h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 920,  y: 148, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 1060, y: 125, w: 75,  h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 1200, y: 155, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 1340, y: 130, w: 90,  h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 80,   y: 155, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 230,  y: 135, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 370,  y: 115, w: 100, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 500,  y: 145, w: 120, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 650,  y: 120, w: 105, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 790,  y:  95, w: 100, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 920,  y: 128, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 1060, y: 105, w: 105, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 1200, y: 135, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 1340, y: 110, w: 120, h: 8,  color: '#5c3d2e', oneWay: true },
   // step-down ledges leading into the water
-  { x: 1700, y: 235, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 1820, y: 260, w: 80,  h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 1700, y: 235, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 1820, y: 260, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
   // seafloor solid rock — closes the bottom of the water zone
   { x: WATER_ZONE.x, y: WATER_FLOOR_Y, w: WATER_ZONE.w, h: 80, color: '#1a1a2e' },
   // underwater rock shelves / ledges
@@ -77,6 +78,35 @@ const platforms = [
 ];
 
 const WORLD_W = 6100;
+
+// shooting stars
+const _bgShoots = [];
+let _bgShootCooldown = 0;
+
+function _tickShoots() {
+  _bgShootCooldown--;
+  if (_bgShootCooldown <= 0) {
+    // spawn from top-right area, travel down-left at a shallow angle
+    const startX = VIEW_W * 0.3 + Math.random() * VIEW_W * 0.8;
+    const startY = Math.random() * VIEW_H * 0.45;
+    const spd    = 2.5 + Math.random() * 2.5;
+    const angle  = Math.PI * (0.75 + Math.random() * 0.15); // mostly left, slightly down
+    _bgShoots.push({
+      x: startX, y: startY,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd * 0.35,
+      life: 28 + Math.floor(Math.random() * 18),
+      maxLife: 46,
+      len: 6 + Math.floor(Math.random() * 7),
+    });
+    _bgShootCooldown = 600 + Math.floor(Math.random() * 600); // very infrequent
+  }
+  for (let i = _bgShoots.length - 1; i >= 0; i--) {
+    const s = _bgShoots[i];
+    s.x += s.vx; s.y += s.vy; s.life--;
+    if (s.life <= 0 || s.x < -20 || s.y > VIEW_H) _bgShoots.splice(i, 1);
+  }
+}
 
 const stars = Array.from({ length: 80 }, () => ({
   x:     Math.random() * WORLD_W,
@@ -241,6 +271,25 @@ function drawBg() {
   }
   if (_starOC) ctx.drawImage(_starOC, 0, 0);
 
+  // shooting stars
+  _tickShoots();
+  for (const s of _bgShoots) {
+    const a = (s.life / s.maxLife) * 0.45; // subtle
+    ctx.globalAlpha = a;
+    // pixelated trail — draw as discrete 1px dots stepping back along velocity
+    ctx.fillStyle = '#cce8ff';
+    for (let t = 0; t < s.len; t++) {
+      const ta = 1 - t / s.len;
+      ctx.globalAlpha = a * ta;
+      ctx.fillRect(Math.round(s.x - s.vx * t * 0.6), Math.round(s.y - s.vy * t * 0.6), 1, 1);
+    }
+    // bright head pixel
+    ctx.globalAlpha = a;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, 1);
+  }
+  ctx.globalAlpha = 1;
+
   // clouds — blit pre-baked cloud sprites
   for (let i = 0; i < clouds.length; i++) {
     const c = clouds[i];
@@ -266,39 +315,124 @@ function drawRain() {
   ctx.globalAlpha = 1;
 }
 
+const VINE_OVERFLOW = 16; // extra canvas height for hanging vines
+
 function _bakePlatform(p) {
-  const oc = getOC('plat_' + p.x + '_' + p.y, p.w, p.h);
+  const isRock = p.color === '#1a1a2e' || p.color === '#1a2a3a' || p.color === '#1e2a3a';
+  const isUnderwater = isRock && p.oneWay;
+  const canvasH = (p.oneWay && !isRock) ? p.h + VINE_OVERFLOW : p.h;
+  const oc = getOC('plat_' + p.x + '_' + p.y, p.w, canvasH);
   const fc = oc._ctx;
-  // pool walls, floors, and rock slabs use their raw color — no grass
-  const isRock = p.color === '#1a1a2e' || p.color === '#1a2a3a';
-  if (p.oneWay) {
-    fc.fillStyle = '#7a5544'; fc.fillRect(0, 0, p.w, 3);
-    fc.fillStyle = p.color;  fc.fillRect(0, 3, p.w, p.h - 3);
-    fc.fillStyle = '#5c8a3c';
-    for (let gx = 4; gx < p.w - 4; gx += 8) fc.fillRect(gx, 0, 2, 3);
+
+  if (isUnderwater) {
+    // underwater rock ledge
+    fc.fillStyle = '#1c2e40'; fc.fillRect(0, 0, p.w, p.h);
+    fc.fillStyle = '#243848';
+    for (let rx = 0; rx < p.w; rx += 14) { fc.fillRect(rx, 0, 7, 2); fc.fillRect(rx + 5, 3, 5, 2); }
+    fc.fillStyle = '#162230'; fc.fillRect(0, p.h - 2, p.w, 2);
+    // algae tufts on top
+    fc.fillStyle = '#1a5a3a';
+    for (let ax = 3; ax < p.w - 3; ax += 9) fc.fillRect(ax, 0, 2, 3);
+    fc.fillStyle = '#228844';
+    for (let ax = 6; ax < p.w - 6; ax += 11) fc.fillRect(ax, 0, 1, 4);
+
   } else if (isRock) {
+    // solid rock wall/floor
     fc.fillStyle = p.color; fc.fillRect(0, 0, p.w, p.h);
-  } else {
-    const totalH = p.h;
-    fc.fillStyle = '#4a9e30'; fc.fillRect(0, 0, p.w, 3);
-    fc.fillStyle = '#6dc442';
-    for (let gx = 2; gx < p.w; gx += 6) fc.fillRect(gx, 0, 2, 2);
-    fc.fillStyle = '#7a4f2a'; fc.fillRect(0, 3, p.w, 10);
-    fc.fillStyle = '#5c3a1e'; fc.fillRect(0, 13, p.w, 20);
-    fc.fillStyle = '#3d2410'; fc.fillRect(0, 33, p.w, 30);
-    fc.fillStyle = '#2e2218'; fc.fillRect(0, 63, p.w, 20);
-    if (totalH > 83) {
-      fc.fillStyle = '#1a2a3a'; fc.fillRect(0, 83, p.w, totalH - 83);
-      fc.fillStyle = '#1e3d5a';
-      for (let wy2 = 90; wy2 < totalH; wy2 += 12)
-        for (let wx2 = 3; wx2 < p.w - 3; wx2 += 18)
-          fc.fillRect(wx2, wy2, 8, 1);
+    fc.fillStyle = '#22334a';
+    for (let ry = 4; ry < p.h; ry += 10)
+      for (let rx = 3; rx < p.w - 3; rx += 20) fc.fillRect(rx, ry, 9, 2);
+    fc.fillStyle = '#141e2e';
+    for (let ry = 9; ry < p.h; ry += 10)
+      for (let rx = 11; rx < p.w - 3; rx += 20) fc.fillRect(rx, ry, 6, 1);
+
+  } else if (p.oneWay) {
+    // floating platform — wood plank top with grass and hanging vines
+    const W = p.w, H = p.h;
+
+    // wood base
+    fc.fillStyle = '#6b4530'; fc.fillRect(0, 2, W, H - 2);
+    fc.fillStyle = '#5a3825'; fc.fillRect(0, H - 3, W, 3);
+
+    // plank grain lines
+    fc.fillStyle = '#7a5040';
+    for (let gx = 0; gx < W; gx += 10) { fc.fillRect(gx, 2, 1, H - 4); }
+    fc.fillStyle = '#4a2e18';
+    for (let gx = 5; gx < W; gx += 10) { fc.fillRect(gx, 3, 1, H - 5); }
+
+    // grass top strip
+    fc.fillStyle = '#3a8a28'; fc.fillRect(0, 0, W, 3);
+    fc.fillStyle = '#4eb034';
+    for (let gx = 2; gx < W - 2; gx += 5) fc.fillRect(gx, 0, 2, 2);
+    fc.fillStyle = '#6ed648';
+    for (let gx = 4; gx < W - 4; gx += 9) fc.fillRect(gx, 0, 1, 1);
+
+    // grass blades poking up (drawn within canvas, will overlap top of grass strip)
+    fc.fillStyle = '#55c038';
+    for (let gx = 3; gx < W - 3; gx += 7) { fc.fillRect(gx, 0, 1, 2); }
+    fc.fillStyle = '#3a8a28';
+    for (let gx = 6; gx < W - 6; gx += 11) { fc.fillRect(gx, 0, 1, 2); }
+
+    // hanging vines from bottom — deterministic using x position
+    const vineColors = ['#2a7a1a', '#1e6012', '#3a9a22', '#228818'];
+    let vx = 6;
+    let vi = 0;
+    while (vx < W - 4) {
+      const vineLen = 6 + ((vx * 7 + vi * 13) % 10); // 6–15px
+      const col = vineColors[vi % vineColors.length];
+      fc.fillStyle = col;
+      // main vine stem
+      for (let vy = H; vy < H + vineLen; vy++) fc.fillRect(vx, vy, 1, 1);
+      // small leaf bumps
+      if (vineLen > 8) {
+        fc.fillStyle = '#44bb22';
+        fc.fillRect(vx - 1, H + 4, 1, 1);
+        fc.fillRect(vx + 1, H + 7, 1, 1);
+      }
+      vx += 5 + ((vx * 3 + vi) % 6);
+      vi++;
     }
-    fc.fillStyle = '#4a3828';
-    for (let dx = 10; dx < p.w - 10; dx += 23) {
-      fc.fillRect(dx,      16, 3, 2);
-      fc.fillRect(dx + 11, 28, 2, 2);
-      fc.fillRect(dx + 5,  42, 3, 2);
+
+  } else {
+    // ground slab — layered soil with detailed grass top
+    const totalH = p.h;
+
+    // grass layer
+    fc.fillStyle = '#3a8a28'; fc.fillRect(0, 0, p.w, 4);
+    fc.fillStyle = '#4eb034';
+    for (let gx = 2; gx < p.w; gx += 5) fc.fillRect(gx, 0, 2, 3);
+    fc.fillStyle = '#6ed648';
+    for (let gx = 4; gx < p.w; gx += 9) fc.fillRect(gx, 0, 1, 2);
+    // grass blades
+    fc.fillStyle = '#55c038';
+    for (let gx = 3; gx < p.w - 2; gx += 7) fc.fillRect(gx, 0, 1, 2);
+    fc.fillStyle = '#3a8a28';
+    for (let gx = 7; gx < p.w - 4; gx += 13) fc.fillRect(gx, 0, 1, 2);
+
+    // topsoil
+    fc.fillStyle = '#7a4f2a'; fc.fillRect(0, 4, p.w, 8);
+    fc.fillStyle = '#8a5c32';
+    for (let dx = 6; dx < p.w - 6; dx += 16) fc.fillRect(dx, 5, 4, 2);
+
+    // mid dirt layers
+    fc.fillStyle = '#5c3a1e'; fc.fillRect(0, 12, p.w, 18);
+    fc.fillStyle = '#6b4526';
+    for (let dx = 3; dx < p.w - 3; dx += 20) { fc.fillRect(dx, 14, 6, 2); fc.fillRect(dx + 9, 22, 5, 2); }
+    fc.fillStyle = '#3d2410'; fc.fillRect(0, 30, p.w, 28);
+    // rock flecks
+    fc.fillStyle = '#2a1a0c';
+    for (let dx = 8; dx < p.w - 8; dx += 22) { fc.fillRect(dx, 35, 3, 2); fc.fillRect(dx + 10, 44, 4, 2); }
+
+    fc.fillStyle = '#2e1e10'; fc.fillRect(0, 58, p.w, 20);
+    fc.fillStyle = '#261808';
+    for (let dx = 5; dx < p.w - 5; dx += 18) fc.fillRect(dx, 62, 5, 3);
+
+    if (totalH > 78) {
+      fc.fillStyle = '#1a1e28'; fc.fillRect(0, 78, p.w, totalH - 78);
+      fc.fillStyle = '#1e2a3a';
+      for (let wy2 = 84; wy2 < totalH; wy2 += 10)
+        for (let wx2 = 4; wx2 < p.w - 4; wx2 += 18)
+          fc.fillRect(wx2, wy2, 7, 1);
     }
   }
   p._oc = oc;

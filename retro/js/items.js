@@ -46,6 +46,7 @@ function updateItems() {
         Math.abs(pcy - oy) < (player.h / 2 + orange.h / 2)) {
       orange.collected = true;
       hasOrange = true;
+      playSound('getorange');
     }
   }
 

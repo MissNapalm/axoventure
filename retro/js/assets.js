@@ -20,3 +20,26 @@ for (const name of required) {
 function assetsReady() {
   return loaded >= required.length;
 }
+
+// ── Sound ─────────────────────────────────────────────────────────────────────
+const sounds = {};
+const soundFiles = ['dash', 'homing', 'redguyflip', 'bigfishcharge', 'die', 'getorange', 'dialogdone', 'textletterloop'];
+for (const name of soundFiles) {
+  sounds[name] = new Audio(name + '.wav');
+  sounds[name].preload = 'auto';
+}
+sounds['textletterloop'].loop = true;
+
+function playSound(name) {
+  const s = sounds[name];
+  if (!s) return;
+  s.currentTime = 0;
+  s.play().catch(() => {});
+}
+
+function stopSound(name) {
+  const s = sounds[name];
+  if (!s) return;
+  s.pause();
+  s.currentTime = 0;
+}

@@ -5,10 +5,15 @@ function makeEnemy(x, patrolLeft, patrolRight, platformY) {
   return {
     x, startX: x,
     w: 0, h: 0,
-    get y() { return platformY - this.h; },
+    get y() {
+      if (this.flipped || this.carried || this.thrown) return this._y;
+      return this.platformY - this.h;
+    },
+    _y: 0,
     platformY,
     patrolSpeed: 0.8,
     vx: 0.8,
+    vy: 0,
     patrolLeft, patrolRight,
     hp: 2,
     shakeTimer: 0,
@@ -21,16 +26,21 @@ function makeEnemy(x, patrolLeft, patrolRight, platformY) {
     respawnTimer: 0,
     lastHitBy: null,
     particles: [],
+    flipped: false,
+    flippedTimer: 0,
+    carried: false,
+    thrown: false,
+    throwAngle: 0,
   };
 }
 
 const enemies = [
-  // upper section
-  makeEnemy(100,   80,  155, 175),
-  makeEnemy(530,  500,  585, 165),
-  makeEnemy(680,  650,  720, 140),
-  makeEnemy(950,  920, 995,  148),
-  makeEnemy(1230, 1200, 1275, 155),
+  // upper section — platformY = platform.y (top surface; getter returns platformY - h)
+  makeEnemy(100,   80,  190, 155),
+  makeEnemy(530,  500,  620, 145),
+  makeEnemy(680,  650,  755, 120),
+  makeEnemy(950,  920, 1030, 128),
+  makeEnemy(1230, 1200, 1310, 135),
 ];
 
 function makeRedEnemy(x, patrolLeft, patrolRight, platformY) {
@@ -44,7 +54,7 @@ function makeRedEnemy(x, patrolLeft, patrolRight, platformY) {
         return player.y - this.h + S.carryOffset + jumpExtra;
       }
       if (this.flipped || this.thrown) return this._y;
-      return platformY - this.h;
+      return this.platformY - this.h;
     },
     _y: 0,
     platformY,
@@ -72,6 +82,7 @@ const redEnemies = [
 
 // called from player.js when homing into a red enemy
 function flipRedEnemy(e) {
+  playSound('redguyflip');
   e.flipping = true;
   e.flipped = false;
   e._y = e.y;
@@ -141,7 +152,7 @@ function updateRedEnemies() {
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
           player.carrying = null;
-          player.killText = { text: 'THROW HIT!', timer: 50, x: e.x + e.w / 2, y: e.y - 12 };
+          player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e.y - 12 };
           registerKill();
           break;
         }
@@ -153,11 +164,38 @@ function updateRedEnemies() {
       e.throwAngle += 0.18;
       e.vy += S.redFlipGrav;
       e._y += e.vy;
-      if (e._y + e.h >= e.platformY) {
-        e._y = e.platformY - e.h;
-        e.flipping = false;
-        e.flipped = true; e.flippedTimer = 0;
-        e.vy = 0; e.throwAngle = 0;
+
+      // kill if crossing water surface
+      const _fl = e.x, _fr = e.x + e.w, _fb = e._y + e.h;
+      const _inWZf = (_fr > WATER_ZONE.x && _fl < WATER_ZONE.x + WATER_ZONE.w && _fb > WATER_ZONE.y)
+                  || (_fr > WATER_ZONE_2.x && _fl < WATER_ZONE_2.x + WATER_ZONE_2.w && _fb > WATER_ZONE_2.y);
+      if (_inWZf) { e.dead = true; spawnDeathStars(e); if (player.carrying === e) player.carrying = null; registerKill(); continue; }
+
+      // check platforms first so enemy lands on them rather than falling through
+      let flippingLanded = false;
+      for (const p of platforms) {
+        const ox = Math.min(e.x + e.w, p.x + p.w) - Math.max(e.x, p.x);
+        if (ox <= 0) continue;
+        const prevBottom = e._y + e.h - e.vy;
+        if (e.vy > 0 && prevBottom <= p.y + 1 && e._y + e.h >= p.y) {
+          e._y = p.y - e.h;
+          e.flipping = false;
+          e.flipped = true; e.flippedTimer = 0;
+          e.vy = 0; e.throwAngle = 0;
+          flippingLanded = true;
+          break;
+        }
+      }
+      if (!flippingLanded && e._y + e.h >= e.platformY) {
+        // only land on the original ground if still within the original patrol range — otherwise it's a phantom floor
+        if (e.x + e.w > e.patrolLeft && e.x < e.patrolRight) {
+          e._y = e.platformY - e.h;
+          e.flipping = false;
+          e.flipped = true; e.flippedTimer = 0;
+          e.vy = 0; e.throwAngle = 0;
+        } else {
+          e.dead = true; spawnDeathStars(e); if (player.carrying === e) player.carrying = null; registerKill();
+        }
       }
       continue;
     }
@@ -167,6 +205,12 @@ function updateRedEnemies() {
       e.vy += 0.25;
       e.x  += e.vx;
       e._y += e.vy;
+
+      // kill if crossing water surface
+      const _tl = e.x, _tr = e.x + e.w, _tb = e._y + e.h;
+      const _inWZ = (_tr > WATER_ZONE.x && _tl < WATER_ZONE.x + WATER_ZONE.w && _tb > WATER_ZONE.y)
+                 || (_tr > WATER_ZONE_2.x && _tl < WATER_ZONE_2.x + WATER_ZONE_2.w && _tb > WATER_ZONE_2.y);
+      if (_inWZ) { e.dead = true; spawnDeathStars(e); if (player.carrying === e) player.carrying = null; registerKill(); continue; }
 
       // check collision with normal enemies
       for (const ne of enemies) {
@@ -178,7 +222,7 @@ function updateRedEnemies() {
           e.dead  = true; spawnDeathStars(e);
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
-          player.killText = { text: 'THROW HIT!', timer: 50, x: e.x + e.w / 2, y: e._y - 12 };
+          player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
           registerKill();
           break;
         }
@@ -198,12 +242,16 @@ function updateRedEnemies() {
         }
       }
 
-      // hit ground
+      // hit ground — only if still over original patrol range, otherwise kill
       if (e._y + e.h >= e.platformY) {
-        e._y = e.platformY - e.h;
-        e.vy *= -0.45;
-        e.vx *= 0.8;
-        if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; }
+        if (e.x + e.w > e.patrolLeft && e.x < e.patrolRight) {
+          e._y = e.platformY - e.h;
+          e.vy *= -0.45;
+          e.vx *= 0.8;
+          if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; }
+        } else {
+          e.dead = true; spawnDeathStars(e); if (player.carrying === e) player.carrying = null; registerKill();
+        }
       }
       continue;
     }
@@ -212,20 +260,43 @@ function updateRedEnemies() {
     e.frameTimer++;
     if (e.frameTimer >= 10) { e.frameTimer = 0; e.frame = (e.frame + 1) % 2; }
 
+    // invisible kill wall at water surface — any overlap with water x-range at or below water surface y kills instantly
+    {
+      const _rl = e.x, _rr = e.x + e.w, _rt = e.y, _rb = e.y + e.h;
+      const _hitsW1 = _rr > WATER_ZONE.x && _rl < WATER_ZONE.x + WATER_ZONE.w && _rb > WATER_ZONE.y;
+      const _hitsW2 = _rr > WATER_ZONE_2.x && _rl < WATER_ZONE_2.x + WATER_ZONE_2.w && _rb > WATER_ZONE_2.y;
+      if (_hitsW1 || _hitsW2) { e.dead = true; spawnDeathStars(e); if (player.carrying === e) player.carrying = null; registerKill(); continue; }
+    }
+
     if (e.flipped) {
       e.flippedTimer++;
       if (e.flippedTimer >= 180) {
+        e.platformY = e._y + e.h; // stand up on whatever surface it's resting on
         e.flipped = false;
         e.flippedTimer = 0;
         e._y = 0;
         e.patrolLeft  = e.x - 40;
         e.patrolRight = e.x + 40;
+        // clamp patrol range away from water zone edges
+        if (e.patrolRight > WATER_ZONE.x && e.x < WATER_ZONE.x) e.patrolRight = WATER_ZONE.x - e.w;
+        if (e.patrolLeft  < WATER_ZONE.x + WATER_ZONE.w && e.x >= WATER_ZONE.x + WATER_ZONE.w) e.patrolLeft = WATER_ZONE.x + WATER_ZONE.w;
+        if (e.patrolRight > WATER_ZONE_2.x && e.x < WATER_ZONE_2.x) e.patrolRight = WATER_ZONE_2.x - e.w;
+        if (e.patrolLeft  < WATER_ZONE_2.x + WATER_ZONE_2.w && e.x >= WATER_ZONE_2.x + WATER_ZONE_2.w) e.patrolLeft = WATER_ZONE_2.x + WATER_ZONE_2.w;
         e.vx = e.patrolSpeed;
       }
       continue;
     }
 
-    // patrol
+    // patrol — check for ledge ahead before moving
+    {
+      const probeX = e.vx > 0 ? e.x + e.w + 1 : e.x - 1;
+      const probeY = e.platformY + 1;
+      let hasGround = false;
+      for (const p of platforms) {
+        if (probeX >= p.x && probeX <= p.x + p.w && probeY >= p.y && probeY <= p.y + p.h + 4) { hasGround = true; break; }
+      }
+      if (!hasGround) e.vx = -e.vx;
+    }
     e.x += e.vx;
     if (e.x <= e.patrolLeft)        { e.x = e.patrolLeft;        e.vx =  Math.abs(e.vx); }
     if (e.x + e.w >= e.patrolRight) { e.x = e.patrolRight - e.w; e.vx = -Math.abs(e.vx); }
@@ -402,13 +473,11 @@ const fishEnemies = [
   makeFish(3400, 550, 3250, 3600),
   makeFish(3700, 620, 3550, 3850),
   makeFish(3950, 580, 3800, 4100),
-  // regular fish mid-pool (second pool x=4480–4980, floor y=930)
   makeFish(4520, 420, 4490, 4960),
   makeFish(4700, 370, 4490, 4960),
   makeFish(4860, 450, 4490, 4960),
   makeFish(4560, 600, 4490, 4960),
   makeFish(4880, 550, 4490, 4960),
-
 ];
 
 function updateFish() {
@@ -422,7 +491,7 @@ function updateFish() {
 
       if (e.respawnTimer > 0) { e.respawnTimer--; continue; }
       const distFromPlayer = Math.abs(e.startX - (player.x + player.w / 2));
-      if (distFromPlayer > VIEW_W) {
+      if (distFromPlayer > VIEW_W * 2) {
         e.x = e.startX; e.y = e.startY;
         e.vx = 0.7; e.vy = 0;
         e.hp = 1; e.dead = false;
@@ -536,6 +605,7 @@ function drawFish() {
   }
 }
 
+
 // ── Kill combo ────────────────────────────────────────────────────────────────
 const combo = {
   count: 0,
@@ -580,6 +650,7 @@ function updateFury() {
 }
 
 function registerKill() {
+  playSound('die');
   combo.count++;
   combo.timer = combo.WINDOW;
   combo.displayTimer = 0;
@@ -706,7 +777,7 @@ function updateBigFish() {
 
     if (e.dead) {
       const distFromPlayer = Math.abs(e.startX - (player.x + player.w / 2));
-      if (distFromPlayer > VIEW_W) {
+      if (distFromPlayer > VIEW_W * 2) {
         e.x = e.startX; e.y = e.startY;
         e.vx = 0.5; e.vy = 0;
         e.hp = 3; e.dead = false; e.deathFlash = 0; e.hitFlash = 0; e.proximityTimer = 0; e.contactTimer = 0;
@@ -742,6 +813,7 @@ function updateBigFish() {
           e.proximityTimer = 0;
           e.state = 'windup';
           e.stateTimer = WINDUP_FRAMES;
+          playSound('bigfishcharge');
           e.vx = 0;
         }
       } else {
@@ -971,6 +1043,31 @@ function hitBigFishByDash(e, ex, ey) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+function flipEnemy(e) {
+  e.flipping = true;
+  e.flipped = false;
+  e.flippedTimer = 0;
+  e._y = e.y;
+  e.vy = -5;
+  e.vx = 0;
+  e.throwAngle = 0;
+  e.stunTimer = 0;
+  e.shakeTimer = 0;
+}
+
+function carryEnemy(e) {
+  e.flipped = false;
+  e.carried = true;
+}
+
+function throwEnemy(e) {
+  e.carried = false;
+  e.thrown = true;
+  e._y = player.y - e.h / 2;
+  e.vx = player.facingLeft ? -S.throwStrength : S.throwStrength;
+  e.vy = -5;
+}
+
 function hitEnemy(e) {
   if (e.stunTimer > 0 && !fury.active) return; // invincible during spike mode unless fury is on
   if (fury.active) e.hp = 0; else e.hp--;
@@ -1010,9 +1107,143 @@ function updateEnemies() {
         e.hitFlash = 0;
         e.frame = 0; e.frameTimer = 0;
         e.particles = [];
+        e.flipped = false; e.flipping = false; e.flippedTimer = 0;
+        e.carried = false; e.thrown = false;
+        e._y = 0; e.vy = 0; e.throwAngle = 0;
       }
       continue;
     }
+
+    // ── flipping arc (ground-pounded) ────────────────────────────────────────
+    if (e.flipping) {
+      e.throwAngle += 0.18;
+      e.vy += S.redFlipGrav;
+      e._y += e.vy;
+      // platform landing
+      let blueLanded = false;
+      for (const p of platforms) {
+        const pox = Math.min(e.x + e.w, p.x + p.w) - Math.max(e.x, p.x);
+        if (pox <= 0) continue;
+        const prevBot = e._y + e.h - e.vy;
+        if (e.vy > 0 && prevBot <= p.y + 1 && e._y + e.h >= p.y) {
+          e._y = p.y - e.h; e.flipping = false; e.flipped = true; e.flippedTimer = 0; e.vy = 0; e.throwAngle = 0; blueLanded = true; break;
+        }
+      }
+      if (!blueLanded && e._y + e.h >= GROUND_Y) {
+        e._y = GROUND_Y - e.h; e.flipping = false; e.flipped = true; e.flippedTimer = 0; e.vy = 0; e.throwAngle = 0;
+      }
+      continue;
+    }
+
+    // ── flipped / carried / thrown (ground-pounded) ──────────────────────────
+    if (e.carried) {
+      const xOff = player.facingLeft ? S.carryOffsetL : S.carryOffsetR;
+      const jumpXOff = player.onGround ? 0 : (player.facingLeft ? S.carryJumpXL : S.carryJumpXR);
+      e.x = player.x + player.w / 2 - e.w / 2 + xOff + jumpXOff;
+      e._y = player.y - e.h + S.carryOffset + (!player.onGround ? (player.facingLeft ? S.carryJumpYL : S.carryJumpYR) : 0);
+      e.frameTimer++;
+      if (e.frameTimer >= 10) { e.frameTimer = 0; e.frame = (e.frame + 1) % 2; }
+      continue;
+    }
+
+    if (e.thrown) {
+      e.throwAngle += e.vx * 0.07; // spin like red enemy
+      e.vy += 0.25; // identical gravity to thrown red enemy
+      e._y += e.vy;
+      e.x  += e.vx;
+      // animate while thrown
+      e.frameTimer++;
+      if (e.frameTimer >= 10) { e.frameTimer = 0; e.frame = (e.frame + 1) % 2; }
+      // water / out-of-world kill
+      const _fb2 = e._y + e.h > WATER_ZONE.y && e.x + e.w > WATER_ZONE.x && e.x < WATER_ZONE.x + WATER_ZONE.w;
+      const _fb3 = e._y + e.h > WATER_ZONE_2.y && e.x + e.w > WATER_ZONE_2.x && e.x < WATER_ZONE_2.x + WATER_ZONE_2.w;
+      if (_fb2 || _fb3 || e._y > 1200) { e.dead = true; spawnDeathStars(e); registerKill(); continue; }
+      // collision with red enemies — both die (only when moving toward them, not arcing away)
+      for (const re of redEnemies) {
+        if (re.dead || re.carried) continue;
+        const rox = Math.min(e.x + e.w, re.x + re.w) - Math.max(e.x, re.x);
+        const roy = Math.min(e._y + e.h, re.y + re.h) - Math.max(e._y, re.y);
+        if (rox > 0 && roy > 6) {
+          re.dead = true; spawnDeathStars(re);
+          e.dead  = true; spawnDeathStars(e);
+          triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
+          screenShakeTimer = 6;
+          player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
+          registerKill(); registerKill();
+          break;
+        }
+      }
+      if (e.dead) continue;
+      // collision with other blue enemies — both die
+      for (const ne of enemies) {
+        if (ne === e || ne.dead || ne.flipped || ne.carried || ne.thrown) continue;
+        const nox = Math.min(e.x + e.w, ne.x + ne.w) - Math.max(e.x, ne.x);
+        const noy = Math.min(e._y + e.h, ne.y + ne.h) - Math.max(e._y, ne.y);
+        if (nox > 0 && noy > 6) {
+          ne.dead = true; spawnDeathStars(ne);
+          e.dead  = true; spawnDeathStars(e);
+          triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
+          screenShakeTimer = 6;
+          player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
+          registerKill(); registerKill();
+          break;
+        }
+      }
+      if (e.dead) continue;
+      // platform bounce — identical to red enemy
+      for (const p of platforms) {
+        if (p.oneWay && e.vy < 0) continue;
+        const ox2 = Math.min(e.x + e.w, p.x + p.w) - Math.max(e.x, p.x);
+        if (ox2 > 0 && e._y + e.h >= p.y && e._y + e.h - e.vy <= p.y + 2) {
+          e._y = p.y - e.h; e.vy *= -0.5; e.vx *= 0.85;
+          if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; e.throwAngle = 0; }
+          break;
+        }
+      }
+      if (e.dead) continue;
+      // ground floor bounce — identical to red enemy
+      if (e._y + e.h >= GROUND_Y) {
+        e._y = GROUND_Y - e.h; e.vy *= -0.45; e.vx *= 0.8;
+        if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; e.throwAngle = 0; }
+      }
+      continue;
+    }
+
+    if (e.flipped) {
+      e.flippedTimer++;
+      // gravity + platform/ground landing — clamp to downward only so bounce setting can't push upward
+      e.vy += S.redFlipGrav;
+      e._y += e.vy;
+      // platform landing — snap any time bottom is inside platform top surface
+      for (const p of platforms) {
+        if (p.oneWay && e.vy < 0) continue;
+        const pox = Math.min(e.x + e.w, p.x + p.w) - Math.max(e.x, p.x);
+        if (pox > 0 && e._y + e.h >= p.y && e._y < p.y + p.h) {
+          e._y = p.y - e.h; e.vy = 0; break;
+        }
+      }
+      // ground floor
+      if (e._y + e.h >= GROUND_Y) { e._y = GROUND_Y - e.h; e.vy = 0; }
+      // animate while flipped
+      e.frameTimer++;
+      if (e.frameTimer >= 10) { e.frameTimer = 0; e.frame = (e.frame + 1) % 2; }
+      // player walks into flipped blue = carry
+      const ox2 = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
+      const oy2 = Math.min(player.y + player.h, e._y + e.h) - Math.max(player.y, e._y);
+      if (ox2 > 0 && oy2 > 0 && !player.carrying && !player.dashing) {
+        carryEnemy(e); player.carrying = e; continue;
+      }
+      // stand back up after 300 frames (~5s)
+      if (e.flippedTimer >= 300) {
+        e.platformY = e._y + e.h; // lock patrol ground to wherever it landed
+        e.patrolLeft  = e.x - 80;
+        e.patrolRight = e.x + e.w + 80;
+        e.flipped = false; e.flippedTimer = 0; e._y = 0; e.vy = 0;
+        e.vx = e.patrolSpeed; e.stunTimer = 0; e.shakeTimer = 0;
+      }
+      continue;
+    }
+
     if (e.hitFlash > 0) e.hitFlash--;
     if (e.shakeTimer > 0) {
       e.shakeTimer--;
@@ -1031,6 +1262,17 @@ function updateEnemies() {
         if (ox > 0 && oy > 0 && player.hurtTimer === 0) hurtPlayer();
       }
       continue;
+    }
+
+    // ledge detection — same as red enemy
+    {
+      const probeX = e.vx > 0 ? e.x + e.w + 1 : e.x - 1;
+      const probeY = e.platformY + 1;
+      let hasGround = false;
+      for (const p of platforms) {
+        if (probeX >= p.x && probeX <= p.x + p.w && probeY >= p.y && probeY <= p.y + p.h + 4) { hasGround = true; break; }
+      }
+      if (!hasGround) e.vx = -e.vx;
     }
 
     e.x += e.vx;
@@ -1086,6 +1328,21 @@ function drawEnemies() {
 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
+
+    // flipping/thrown arc — spin; flipped/carried — upside-down
+    if (e.flipping || e.flipped || e.carried || e.thrown) {
+      const fsy = Math.round(e._y + S.blueFlippedGndY - cameraY);
+      const fspr = sprites[e.frame === 0 ? 'badguy1' : 'badguy2'];
+      ctx.translate(sx + e.w / 2, fsy + e.h / 2);
+      if (e.flipping || e.thrown) {
+        ctx.rotate(e.throwAngle);
+      } else {
+        ctx.scale(1, -1);
+      }
+      ctx.drawImage(fspr, -e.w / 2, -e.h / 2, e.w, e.h);
+      ctx.restore();
+      continue;
+    }
 
     const spr = e.deathFlash > 0
       ? sprites[e.frame === 0 ? 'badguy1' : 'badguy2']

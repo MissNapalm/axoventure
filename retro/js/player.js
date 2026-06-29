@@ -43,6 +43,9 @@ const player = {
   splash: [],         // splash particles
   waterDashHeld: false,
   groundDashFlash: 0, // decays from 1→0 after dash starts, drives tint alpha
+  groundPoundWindup: 0,   // >0 = frozen pre-launch, counts down
+  groundPounding: false,  // true = diving straight down
+  groundPoundSpin: 0,     // visual spin angle (radians)
 };
 
 function resetLevel() {
@@ -60,6 +63,7 @@ function resetLevel() {
   player.killText = null;
   player.carrying = null;
   player.groundDashing = false; player.groundDashTimer = 0; player.airDashUsed = false; player.knockbackTimer = 0;
+  player.groundPoundWindup = 0; player.groundPounding = false; player.groundPoundSpin = 0;
   player.inWater = false;
   player.wasInWater = false;
   player.waterExitSpin = 0;
@@ -225,13 +229,20 @@ function updatePlayer() {
   if (consumeKey('KeyF') && fury.ready && !fury.active) activateFury();
   if (consumeKey('KeyW') && !fury.active) activateFury();
 
-  // M key: throw if carrying, else dash, else run held
+  // M key: throw if carrying, ground pound if airborne+down, else dash, else run held
   if (consumeKey('KeyM')) {
     if (dialog.active) {
       if (dialog.done) advanceDialog();
     } else if (player.carrying) {
-      throwRedEnemy(player.carrying);
+      // throw blue or red enemy
+      if (player.carrying.red) { throwRedEnemy(player.carrying); } else { throwEnemy(player.carrying); }
       player.carrying = null;
+    } else if (!player.onGround && !player.inWater && !player.dashing && !player.groundDashing &&
+               !player.groundPounding && player.groundPoundWindup === 0 && keys['KeyX']) {
+      // ground pound
+      player.groundPoundWindup = 20;
+      player.groundPoundSpin = 0;
+      player.vx = 0; player.vy = 0;
     } else {
       const nearby = nearNpc();
       if (nearby) {
@@ -251,12 +262,14 @@ function updatePlayer() {
           const nx = dx / len;
           const ny = dy / len;
           const dashSpd = GROUND_DASH_SPEED;
+          playSound('homing');
           player.groundDashing = true;
           player.groundDashTimer = GROUND_DASH_FRAMES;
           player.groundDashFlash = 1;
           player.groundDashAngle = Math.atan2(ny, nx);
           player.vx = nx * dashSpd;
           player.vy = ny * dashSpd;
+          player.waterExitSpin = 0;
           if (nx !== 0) player.facingLeft = nx < 0;
           if (!player.onGround && !player.inWater) player.airDashUsed = true;
           if (player.inWater) player.dashedFromWater = true;
@@ -347,11 +360,12 @@ function updatePlayer() {
       const SPLASH_KILL_RADIUS = 40;
       for (const e of redEnemies) {
         if (e.dead) continue;
-        const ex = e.x + e.w / 2, ey = (e._y !== undefined ? e._y : e.y) + e.h / 2;
+        const ex = e.x + e.w / 2, ey = e.y + e.h / 2;
         if (Math.hypot(ex - pcx, ey - pcy) <= SPLASH_KILL_RADIUS) {
           e.dead = true;
           spawnDeathStars(e);
           if (player.carrying === e) player.carrying = null;
+          player.killText = { text: 'SPLASH!', timer: 50, maxTimer: 50, x: ex, y: ey - 12 };
           registerKill();
         }
       }
@@ -485,11 +499,26 @@ function updatePlayer() {
     player.homingWindup--;
     player.vx = 0; player.vy = 0;
     if (player.homingWindup === 0 && player.homingWindupTarget && !player.homingWindupTarget.dead) {
+      playSound('homing');
       player.dashing = true;
       player.dashTarget = player.homingWindupTarget;
       player.homingWindupTarget = null;
+      player.waterExitSpin = 0;
     } else if (player.homingWindup === 0) {
       player.homingWindupTarget = null;
+    }
+  }
+
+  // Ground pound windup — tick and launch
+  if (player.groundPoundWindup > 0) {
+    player.groundPoundWindup--;
+    player.vx = 0; player.vy = 0;
+    player.groundPoundSpin += Math.PI * 2 / 20; // full 360 over 20 frames
+    if (player.groundPoundWindup === 0) {
+      player.groundPounding = true;
+      player.groundPoundSpin = 0; // reset so dive draws normally (no rotation)
+      player.vy = 14;
+      player.vx = 0;
     }
   }
 
@@ -540,6 +569,32 @@ function updatePlayer() {
 
   // update splash particles
   { let _sn = 0; for (let i = 0; i < player.splash.length; i++) { const p = player.splash[i]; p.x += p.vx; p.y += p.vy; p.vy += p.gravity; p.life--; if (p.life > 0) player.splash[_sn++] = p; } player.splash.length = _sn; }
+
+  // water-ski wake spray — horizontal surface dash, only when fully submerged
+  if (player.groundDashing && player.inWater && Math.abs(player.vx) > Math.abs(player.vy) * 1.5) {
+    const wz = (pcx >= WATER_ZONE_2.x) ? WATER_ZONE_2 : WATER_ZONE;
+    const surfaceY = wz.y;
+    const depthBelow = (player.y + player.h / 2) - surfaceY;
+    if (depthBelow >= -8 && depthBelow < 32) { // near surface, not deep
+      const wakeDir = player.vx > 0 ? -1 : 1;
+      const sprayX = player.x + (player.vx > 0 ? 0 : player.w);
+      // 8 droplets per frame — big rooster tail
+      for (let i = 0; i < 8; i++) {
+        const speed = 3 + Math.random() * 6;
+        const sideSpread = wakeDir * speed * (0.7 + Math.random() * 1.0);
+        player.splash.push({
+          x: sprayX + (Math.random() - 0.5) * 6,
+          y: surfaceY + Math.random() * 2,
+          vx: sideSpread,
+          vy: -(2.5 + Math.random() * 5.5),
+          life: 18 + Math.floor(Math.random() * 16),
+          maxLife: 34,
+          size: Math.random() < 0.3 ? 3 : Math.random() < 0.6 ? 2 : 1,
+          gravity: 0.28,
+        });
+      }
+    }
+  }
 
   // fury sparks — every 3 frames to keep particle count low
   if (fury.active && fury.flashTimer % 3 === 0) {
@@ -686,6 +741,54 @@ function updatePlayer() {
     }
   }
 
+  // stomp on enemy heads — falling player lands on top
+  if (player.vy > 0 && !player.dashing && !player.groundDashing && !player.inWater &&
+      player.groundPoundWindup === 0 && !player.groundPounding) {
+    const pb = player.y + player.h;
+    const pb_prev = pb - player.vy;
+    let _stomped = false;
+
+    // blue enemies
+    for (const e of enemies) {
+      if (e.dead || e.stunTimer > 0 || e.shakeTimer > 0 || e.flipped || e.carried || e.thrown) continue;
+      const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
+      if (ox <= 2) continue;
+      const et = e.y;
+      if (pb_prev <= et + 4 && pb >= et && pb <= et + e.h / 2) {
+        const wasLastDash = e.lastHitBy === 'dash';
+        hitEnemy(e);
+        e.lastHitBy = 'stomp';
+        player.vy = -4;
+        player.y  = et - player.h;
+        hitFreezeTimer = HIT_FREEZE_FRAMES;
+        screenShakeTimer = SCREEN_SHAKE_FRAMES;
+        spawnImpactVFX(e.x + e.w / 2, et);
+        player.killText = { text: e.dead && wasLastDash ? 'ONE-TWO HIT!' : 'STOMP!', timer: 60, maxTimer: 60, x: e.x + e.w / 2, y: et - 12 };
+        _stomped = true; break;
+      }
+    }
+
+    // red enemies — stomp flips them
+    if (!_stomped) {
+      for (const e of redEnemies) {
+        if (e.dead || e.flipped || e.flipping || e.carried || e.thrown) continue;
+        const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
+        if (ox <= 2) continue;
+        const et = e.y;
+        if (pb_prev <= et + 4 && pb >= et && pb <= et + e.h / 2) {
+          flipRedEnemy(e);
+          player.vy = -4;
+          player.y  = et - player.h;
+          hitFreezeTimer = HIT_FREEZE_FRAMES;
+          screenShakeTimer = SCREEN_SHAKE_FRAMES;
+          spawnImpactVFX(e.x + e.w / 2, et);
+          player.killText = { text: 'STOMP!', timer: 60, maxTimer: 60, x: e.x + e.w / 2, y: et - 12 };
+          break;
+        }
+      }
+    }
+  }
+
   // walk into flipped red enemy = pick up
   if (!player.carrying && !player.dashing) {
     for (const e of redEnemies) {
@@ -698,9 +801,76 @@ function updatePlayer() {
   }
 
   const wasOnGround = player.onGround;
-  if (!(fury.active && player.dashing)) resolveCollisions();
+  if (!(fury.active && player.dashing) && player.groundPoundWindup === 0) {
+    resolveCollisions();
+  }
   player.wasOnGround = wasOnGround;
   if (player.onGround) { player.dashing = false; player.dashTarget = null; player.homingUsed = false; player.airDashUsed = false; }
+
+  // Ground pound landing
+  if (player.groundPounding && player.onGround) {
+    player.groundPounding = false;
+    player.groundPoundSpin = 0;
+    player.vy = -S.gpBounce;
+    player.onGround = false;
+    screenShakeTimer = 28;
+    screenShakeMag = 14;
+    const _gpx = player.x + player.w / 2, _gpy = player.y + player.h;
+    // three shockwave rings — fast tight, medium, slow wide
+    player.shockwaves.push({ x: _gpx, y: _gpy, r: 0, maxR: 40,  speed: 40/10,  life: 10, maxLife: 10, sx: 2.2, sy: 0.5 });
+    player.shockwaves.push({ x: _gpx, y: _gpy, r: 0, maxR: 80,  speed: 80/16,  life: 16, maxLife: 16, sx: 2.4, sy: 0.45 });
+    player.shockwaves.push({ x: _gpx, y: _gpy, r: 0, maxR: 130, speed: 130/24, life: 24, maxLife: 24, sx: 2.6, sy: 0.4 });
+    // big radial rock/dirt chunks flung sideways from impact point
+    const _gpColors = ['#8a6030', '#6a4820', '#a07840', '#4a3010', '#c8a060'];
+    for (let i = 0; i < 48; i++) {
+      // bias angle toward horizontal — more sideways spray than upward
+      const baseAng = Math.PI + (Math.random() - 0.5) * Math.PI; // left side
+      const ang = i < 24 ? baseAng : (Math.random() - 0.5) * Math.PI; // right side
+      const spd = 4 + Math.random() * 9;
+      const sz  = Math.random() < 0.25 ? 5 : Math.random() < 0.55 ? 3 : 2;
+      player.sparks.push({
+        x: _gpx + (Math.random() - 0.5) * 10, y: _gpy - Math.random() * 4,
+        vx: Math.cos(ang) * spd, vy: -(1.5 + Math.random() * 6),
+        life: 16 + Math.floor(Math.random() * 18), maxLife: 34,
+        color: _gpColors[Math.floor(Math.random() * _gpColors.length)],
+        size: sz, kind: 'box', gravity: 0.28,
+      });
+    }
+    // white flash sparks at center
+    for (let i = 0; i < 20; i++) {
+      const ang2 = Math.random() * Math.PI * 2;
+      const spd2 = 6 + Math.random() * 8;
+      player.sparks.push({
+        x: _gpx, y: _gpy,
+        vx: Math.cos(ang2) * spd2, vy: Math.sin(ang2) * spd2 - 2,
+        life: 6 + Math.floor(Math.random() * 6), maxLife: 12,
+        color: '#ffffff', size: 2, kind: 'box', gravity: 0.15,
+      });
+    }
+    // flip all nearby enemies within radius
+    const GP_RADIUS = 80;
+    const pcx2 = player.x + player.w / 2;
+    const pcy2 = player.y + player.h;
+    for (const e of enemies) {
+      if (e.dead || e.flipped || e.carried || e.thrown) continue;
+      const ecx = e.x + e.w / 2;
+      const ecy = e.y + e.h / 2;
+      if (Math.hypot(ecx - pcx2, ecy - pcy2) < GP_RADIUS) {
+        flipEnemy(e);
+        player.killText = { text: 'GROUND POUND!', timer: 60, maxTimer: 60, x: pcx2, y: pcy2 - 20 };
+      }
+    }
+    for (const e of redEnemies) {
+      if (e.dead || e.flipped || e.carried || e.thrown || e.flipping) continue;
+      const ecx = e.x + e.w / 2;
+      const ecy = (e._y !== undefined ? e._y : e.y) + e.h / 2;
+      if (Math.hypot(ecx - pcx2, ecy - pcy2) < GP_RADIUS) {
+        flipRedEnemy(e);
+        player.killText = { text: 'GROUND POUND!', timer: 60, maxTimer: 60, x: pcx2, y: pcy2 - 20 };
+      }
+    }
+    hitFreezeTimer = HIT_FREEZE_FRAMES;
+  }
 
   // re-apply underwater dash steering after collision so floor/wall zeroing doesn't eat diagonal velocity
   if (player.groundDashing && player.inWater) {
@@ -876,7 +1046,20 @@ function drawPlayer() {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
 
-  if (player.waterExitSpin > 0) {
+  if (player.groundPoundWindup > 0) {
+    // windup: spin in place
+    const pcx = player.x + player.w / 2 - cameraX;
+    const pcy = player.y + player.h / 2 - cameraY;
+    ctx.translate(pcx, pcy);
+    ctx.rotate(player.groundPoundSpin);
+    ctx.drawImage(sprites['jump'], -sw / 2, -sh / 2, sw, sh);
+  } else if (player.groundPounding) {
+    // dive: normal jump sprite straight down
+    const px2 = Math.round(player.x - cameraX);
+    const py2 = Math.round(player.y - cameraY);
+    if (!player.facingLeft) { ctx.scale(-1, 1); ctx.drawImage(sprites['jump'], -(px2 + sw), py2, sw, sh); }
+    else ctx.drawImage(sprites['jump'], px2, py2, sw, sh);
+  } else if (player.waterExitSpin > 0) {
     const pcx = player.x + player.w / 2 - cameraX;
     const pcy = player.y + player.h / 2 - cameraY;
     ctx.translate(pcx, pcy);
@@ -928,8 +1111,11 @@ function drawPlayer() {
     const foy = isJumping ? (facingLeft ? S.shadesJumpYL : S.shadesJumpYR)
               : isSwimming ? (facingLeft ? S.shadesSwimYL : S.shadesSwimYR)
               : oy;
+    // walk frame eye-height correction: sprite heights differ (28,27,26,26) so anchor from bottom shifts
+    const _walkYCorr = [2, 1, 0, 0];
+    const walkCorr = player.moving && player.onGround ? (_walkYCorr[player.frame % 4] || 0) : 0;
     const fsdx = facingLeft ? px + fox : px + (sw - shd.naturalWidth) - fox;
-    const fsdy = (py + sh) - foy - shd.naturalHeight;
+    const fsdy = (py + sh) - foy - shd.naturalHeight + walkCorr;
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     if (!facingLeft) {
@@ -1091,12 +1277,13 @@ function drawPlayer() {
       player.shockwaves[_swn++] = sw;
       const frac = (sw.life / sw.maxLife) * 0.9;
       ctx.globalAlpha = frac > 0.66 ? 0.9 : frac > 0.33 ? 0.55 : 0.25;
-      const cx = Math.round(sw.x - cameraX), cy = Math.round(sw.y - cameraY), r = Math.round(sw.r);
+      const cx = Math.round(sw.x - cameraX), cy = Math.round(sw.y - cameraY);
+      const rx = Math.round(sw.r * (sw.sx || 1)), ry = Math.round(sw.r * (sw.sy || 1));
       const t = sw.lw || 2;
-      ctx.fillRect(cx - r - t, cy - t, r * 2 + t * 2, t); // top
-      ctx.fillRect(cx - r - t, cy,     r * 2 + t * 2, t); // bottom
-      ctx.fillRect(cx - r - t, cy - t, t, t * 2);         // left
-      ctx.fillRect(cx + r,     cy - t, t, t * 2);         // right
+      ctx.fillRect(cx - rx - t, cy - ry - t, rx * 2 + t * 2, t); // top
+      ctx.fillRect(cx - rx - t, cy + ry,     rx * 2 + t * 2, t); // bottom
+      ctx.fillRect(cx - rx - t, cy - ry - t, t, ry * 2 + t * 2); // left
+      ctx.fillRect(cx + rx,     cy - ry - t, t, ry * 2 + t * 2); // right
     }
     player.shockwaves.length = _swn;
     ctx.globalAlpha = prevAlpha;
@@ -1126,12 +1313,16 @@ function drawPlayer() {
     ctx.globalAlpha = prevAlpha;
   }
 
-  // underwater tint — subtle blue overlay
+  // underwater tint — suppress near surface (same depth window as wake fountain)
   if (player.inWater) {
-    ctx.globalAlpha = 0.13;
-    ctx.fillStyle = '#1a6090';
-    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
-    ctx.globalAlpha = 1;
+    const _wz = (player.x + player.w / 2 >= WATER_ZONE_2.x) ? WATER_ZONE_2 : WATER_ZONE;
+    const _depth = (player.y + player.h / 2) - _wz.y;
+    if (_depth >= 32) {
+      ctx.globalAlpha = 0.13;
+      ctx.fillStyle = '#1a6090';
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      ctx.globalAlpha = 1;
+    }
   }
 
   // bubbles — fixed pixel patterns by radius, no save/restore per bubble
