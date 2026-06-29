@@ -62,6 +62,7 @@ function updateLightning() {
 
 function drawLightning() {
   if (!lightning.bolt) return;
+  if (player.inWater) return;
 
   const drawPixelLine = (x1, y1, x2, y2, color) => {
     ctx.fillStyle = color;

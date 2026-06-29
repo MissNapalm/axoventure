@@ -102,8 +102,14 @@ function throwRedEnemy(e) {
   e.carried = false;
   e.thrown = true;
   e._y = player.y - e.h / 2;
-  e.vx = player.facingLeft ? -S.throwStrength : S.throwStrength;
-  e.vy = -5;
+  const throwUp = keys['KeyD'] || keys['KeyL'];
+  if (throwUp) {
+    e.vx = 0;
+    e.vy = -(S.throwStrength * 2.2);
+  } else {
+    e.vx = player.facingLeft ? -S.throwStrength : S.throwStrength;
+    e.vy = -5;
+  }
 }
 
 function updateRedEnemies() {
@@ -187,15 +193,10 @@ function updateRedEnemies() {
         }
       }
       if (!flippingLanded && e._y + e.h >= e.platformY) {
-        // only land on the original ground if still within the original patrol range — otherwise it's a phantom floor
-        if (e.x + e.w > e.patrolLeft && e.x < e.patrolRight) {
-          e._y = e.platformY - e.h;
-          e.flipping = false;
-          e.flipped = true; e.flippedTimer = 0;
-          e.vy = 0; e.throwAngle = 0;
-        } else {
-          e.dead = true; spawnDeathStars(e); if (player.carrying === e) player.carrying = null; registerKill();
-        }
+        e._y = e.platformY - e.h;
+        e.flipping = false;
+        e.flipped = true; e.flippedTimer = 0;
+        e.vy = 0; e.throwAngle = 0;
       }
       continue;
     }
@@ -238,20 +239,16 @@ function updateRedEnemies() {
           e._y = p.y - e.h;
           e.vy *= -0.5;
           e.vx *= 0.85;
-          if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; }
+          if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; e.platformY = p.y; }
         }
       }
 
-      // hit ground — only if still over original patrol range, otherwise kill
+      // hit ground — bounce and settle into flipped state
       if (e._y + e.h >= e.platformY) {
-        if (e.x + e.w > e.patrolLeft && e.x < e.patrolRight) {
-          e._y = e.platformY - e.h;
-          e.vy *= -0.45;
-          e.vx *= 0.8;
-          if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; }
-        } else {
-          e.dead = true; spawnDeathStars(e); if (player.carrying === e) player.carrying = null; registerKill();
-        }
+        e._y = e.platformY - e.h;
+        e.vy *= -0.45;
+        e.vx *= 0.8;
+        if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; }
       }
       continue;
     }
@@ -1064,8 +1061,14 @@ function throwEnemy(e) {
   e.carried = false;
   e.thrown = true;
   e._y = player.y - e.h / 2;
-  e.vx = player.facingLeft ? -S.throwStrength : S.throwStrength;
-  e.vy = -5;
+  const throwUp = keys['KeyD'] || keys['KeyL'];
+  if (throwUp) {
+    e.vx = 0;
+    e.vy = -(S.throwStrength * 2.2);
+  } else {
+    e.vx = player.facingLeft ? -S.throwStrength : S.throwStrength;
+    e.vy = -5;
+  }
 }
 
 function hitEnemy(e) {
@@ -1196,7 +1199,7 @@ function updateEnemies() {
         const ox2 = Math.min(e.x + e.w, p.x + p.w) - Math.max(e.x, p.x);
         if (ox2 > 0 && e._y + e.h >= p.y && e._y + e.h - e.vy <= p.y + 2) {
           e._y = p.y - e.h; e.vy *= -0.5; e.vx *= 0.85;
-          if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; e.throwAngle = 0; }
+          if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; e.throwAngle = 0; e.platformY = p.y; }
           break;
         }
       }

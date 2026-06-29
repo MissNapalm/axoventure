@@ -157,8 +157,9 @@ function resolveCollisions() {
 
     if (p.oneWay) {
       const prevBottom = player.y + player.h - player.vy;
-      if (player.vy >= 0 && prevBottom <= p.y + 1) {
-        player.y -= oy;
+      // catch tunneling: previous bottom was above platform top, current bottom is below it
+      if (player.vy >= 0 && prevBottom <= p.y && player.y + player.h >= p.y) {
+        player.y = p.y - player.h;
         player.vy = 0;
         player.onGround = true;
       }
@@ -314,6 +315,13 @@ function updatePlayer() {
     pcx >= WATER_ZONE_2.x && pcx <= WATER_ZONE_2.x + WATER_ZONE_2.w &&
     pcy >= WATER_ZONE_2.y && pcy <= WATER_ZONE_2.y + WATER_ZONE_2.h
   );
+
+  // cancel ground pound on water entry
+  if (player.inWater && !player.wasInWater) {
+    player.groundPounding = false;
+    player.groundPoundWindup = 0;
+    player.groundPoundSpin = 0;
+  }
 
   // water transition — spawn splash
   if (player.inWater !== player.wasInWater) {
@@ -1264,29 +1272,16 @@ function drawPlayer() {
     ctx.restore();
   }
 
-  // shockwave rings — drawn as 4 corner pixels at radius, no arc/stroke
+  // shockwaves — tick and cull only, no draw
   {
-    const prevAlpha = ctx.globalAlpha;
     let _swn = 0;
-    ctx.fillStyle = '#ffffff';
     for (let i = 0; i < player.shockwaves.length; i++) {
       const sw = player.shockwaves[i];
       if (sw.delay > 0) { sw.delay--; player.shockwaves[_swn++] = sw; continue; }
       sw.life--; sw.r += sw.speed;
-      if (sw.life <= 0) continue;
-      player.shockwaves[_swn++] = sw;
-      const frac = (sw.life / sw.maxLife) * 0.9;
-      ctx.globalAlpha = frac > 0.66 ? 0.9 : frac > 0.33 ? 0.55 : 0.25;
-      const cx = Math.round(sw.x - cameraX), cy = Math.round(sw.y - cameraY);
-      const rx = Math.round(sw.r * (sw.sx || 1)), ry = Math.round(sw.r * (sw.sy || 1));
-      const t = sw.lw || 2;
-      ctx.fillRect(cx - rx - t, cy - ry - t, rx * 2 + t * 2, t); // top
-      ctx.fillRect(cx - rx - t, cy + ry,     rx * 2 + t * 2, t); // bottom
-      ctx.fillRect(cx - rx - t, cy - ry - t, t, ry * 2 + t * 2); // left
-      ctx.fillRect(cx + rx,     cy - ry - t, t, ry * 2 + t * 2); // right
+      if (sw.life > 0) player.shockwaves[_swn++] = sw;
     }
     player.shockwaves.length = _swn;
-    ctx.globalAlpha = prevAlpha;
   }
 
   // sparks — pixel boxes only (no stroke), globalAlpha quantized to 4 levels

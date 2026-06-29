@@ -1,6 +1,6 @@
 const settings = {
   gravity:      { value: 0.32,  min: 0.05, max: 1.0,  step: 0.01, label: 'Gravity' },
-  jumpForce:    { value: 6.0,   min: 1.0,  max: 15.0, step: 0.1,  label: 'Jump Height' },
+  jumpForce:    { value: 6.5,   min: 1.0,  max: 15.0, step: 0.1,  label: 'Jump Height' },
   walkSpeed:    { value: 1.8,   min: 0.5,  max: 6.0,  step: 0.1,  label: 'Walk Speed' },
   runMult:      { value: 1.6,   min: 1.0,  max: 5.0,  step: 0.1,  label: 'Run Multiplier' },
   jumpYOffset:  { value: -2,    min: -30,  max: 30,   step: 1,    label: 'Jump Y Offset' },
