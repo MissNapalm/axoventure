@@ -1,10 +1,12 @@
 const keys = {};
 const keysConsumed = {};
+const keysLastHeld = {}; // timestamp of last keydown for each key
 
 window.addEventListener('keydown', e => {
   if (e.code === 'Tab') { e.preventDefault(); settingsOpen = !settingsOpen; return; }
   if (!keys[e.code]) keysConsumed[e.code] = false;
   keys[e.code] = true;
+  keysLastHeld[e.code] = performance.now();
   if (e.code === 'KeyM') e.preventDefault();
 });
 
@@ -19,4 +21,9 @@ function consumeKey(code) {
     return true;
   }
   return false;
+}
+
+// true if key is currently held OR was held within the last ms milliseconds
+function keyRecent(code, ms) {
+  return keys[code] || (keysLastHeld[code] && performance.now() - keysLastHeld[code] < ms);
 }

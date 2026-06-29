@@ -44,6 +44,7 @@ function drawHUD() {
   ctx.textAlign = 'right';
   ctx.fillText(_fpsDisplay + 'fps', VIEW_W - 2, VIEW_H - GH - 5);
   ctx.textAlign = 'left';
+
   // health meter
   const METER_X = 6;
   const METER_Y = 20;

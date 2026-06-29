@@ -158,10 +158,15 @@ function resolveCollisions() {
         player.vy = 0;
         player.onGround = true;
       }
-    } else if (player.inWater && player.groundDashing) {
-      // underwater dash — push out of walls but don't zero velocity or set onGround
-      if (ox < oy) { if (player.x < p.x) player.x -= ox; else player.x += ox; }
-      else { if (player.y < p.y) player.y -= oy; else player.y += oy; }
+    } else if (player.inWater || (player.groundDashing && player.wasInWater)) {
+      // underwater — push out but only zero the blocked axis so diagonal movement slides along walls/floor
+      if (ox < oy) {
+        if (player.x < p.x) player.x -= ox; else player.x += ox;
+        player.vx = 0;
+      } else {
+        if (player.y < p.y) player.y -= oy; else player.y += oy;
+        player.vy = 0;
+      }
     } else {
       if (ox < oy) {
         if (player.x < p.x) player.x -= ox; else player.x += ox;
@@ -233,10 +238,11 @@ function updatePlayer() {
         openDialog(nearby);
       } else if (!player.groundDashing) {
         if (player.onGround || player.inWater || fury.active || (!player.airDashUsed && !player.dashing)) {
-          const dLeft  = keys['KeyS'];
-          const dRight = keys['KeyC'];
-          const dUp    = keys['KeyD'] || keys['KeyL'];
-          const dDown  = keys['KeyX'];
+          // in water, use a short keyRecent window to catch S/X dropped by S+X+M rollover
+          const dLeft  = keys['KeyS'] || (player.inWater && keyRecent('KeyS', 150));
+          const dRight = keys['KeyC'] || (player.inWater && keyRecent('KeyC', 150));
+          const dUp    = keys['KeyD'] || keys['KeyL'] || (player.inWater && (keyRecent('KeyD', 150) || keyRecent('KeyL', 150)));
+          const dDown  = keys['KeyX'] || (player.inWater && keyRecent('KeyX', 150));
           const rawDx  = (dLeft && !dRight) ? -1 : (dRight && !dLeft) ? 1 : 0;
           const rawDy  = (dUp && !dDown) ? -1 : (dDown && !dUp && (!player.onGround || player.inWater)) ? 1 : 0;
           const dx = rawDx !== 0 || rawDy !== 0 ? rawDx : (player.facingLeft ? -1 : 1);
@@ -305,31 +311,31 @@ function updatePlayer() {
 
     // big upward jets
     for (let i = 0; i < 30; i++) {
-      const speed = (5 + Math.random() * 9) * (0.8 + intensity * 0.4);
+      const speed = (2 + Math.random() * 4) * (0.8 + intensity * 0.25);
       player.splash.push({
         x: sx + (Math.random() - 0.5) * player.w * 2,
         y: sy,
-        vx: (Math.random() - 0.5) * speed * 0.9,
-        vy: -(speed * 0.75 + Math.random() * 4),
-        life: 22 + Math.floor(Math.random() * 20),
-        maxLife: 42,
+        vx: (Math.random() - 0.5) * speed * 0.8,
+        vy: -(speed * 0.75 + Math.random() * 1.5),
+        life: 18 + Math.floor(Math.random() * 14),
+        maxLife: 32,
         size: Math.random() < 0.35 ? 3 : Math.random() < 0.65 ? 2 : 1,
-        gravity: 0.20,
+        gravity: 0.35,
       });
     }
     // wide horizontal spray
     for (let i = 0; i < 20; i++) {
       const dir = i < 10 ? -1 : 1;
-      const speed = 3 + Math.random() * 6;
+      const speed = 1.5 + Math.random() * 3;
       player.splash.push({
         x: sx,
         y: sy,
         vx: dir * speed * (1 + Math.random()),
-        vy: -(0.5 + Math.random() * 2.5),
-        life: 10 + Math.floor(Math.random() * 12),
-        maxLife: 22,
+        vy: -(0.3 + Math.random() * 1.2),
+        life: 10 + Math.floor(Math.random() * 10),
+        maxLife: 20,
         size: 1,
-        gravity: 0.30,
+        gravity: 0.40,
       });
     }
 
@@ -337,6 +343,18 @@ function updatePlayer() {
       // entered water — stop spin, clear flag
       player.waterExitSpin = 0;
       player.dashedFromWater = false;
+      // kill any red enemies close to the entry point
+      const SPLASH_KILL_RADIUS = 40;
+      for (const e of redEnemies) {
+        if (e.dead) continue;
+        const ex = e.x + e.w / 2, ey = (e._y !== undefined ? e._y : e.y) + e.h / 2;
+        if (Math.hypot(ex - pcx, ey - pcy) <= SPLASH_KILL_RADIUS) {
+          e.dead = true;
+          spawnDeathStars(e);
+          if (player.carrying === e) player.carrying = null;
+          registerKill();
+        }
+      }
     } else {
       // exited water — spin if dashed or launched upward fast
       if (player.dashedFromWater || player.vy < -3) {
@@ -581,7 +599,7 @@ function updatePlayer() {
         player.vy = -4;
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         spawnImpactVFX(impactX, impactY);
-        player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
+        player.killText = { text: 'HOMING HIT!', timer: 50, maxTimer: 50, x: impactX, y: impactY - 12 };
       } else {
         // spiked AND not freshly triggered by the player (lastHitBy===null means pre-existing spike)
         const spiked = e.stunTimer > 0 && e.lastHitBy === null && !isFuryActive();
@@ -596,9 +614,9 @@ function updatePlayer() {
           screenShakeTimer = SCREEN_SHAKE_FRAMES;
           spawnImpactVFX(impactX, impactY);
           if (e.dead) {
-            player.killText = { text: wasLastDash ? 'ONE-TWO HIT!' : 'HOMING HIT!', timer: 60, x: impactX, y: impactY - 12 };
+            player.killText = { text: wasLastDash ? 'ONE-TWO HIT!' : 'HOMING HIT!', timer: 60, maxTimer: 60, x: impactX, y: impactY - 12 };
           } else {
-            player.killText = { text: 'HOMING HIT!', timer: 50, x: impactX, y: impactY - 12 };
+            player.killText = { text: 'HOMING HIT!', timer: 50, maxTimer: 50, x: impactX, y: impactY - 12 };
             if (player.postDashTimer === 0) player.postDashTimer = 20;
           }
         }
@@ -659,7 +677,7 @@ function updatePlayer() {
               hitFreezeTimer = HIT_FREEZE_FRAMES;
               screenShakeTimer = SCREEN_SHAKE_FRAMES;
               spawnImpactVFX(ex, ey);
-              player.killText = { text: 'DASH HIT!', timer: 50, x: ex, y: ey - 12 };
+              player.killText = { text: 'DASH HIT!', timer: 50, maxTimer: 50, x: ex, y: ey - 12 };
               if (!e.dead && player.postDashTimer === 0) player.postDashTimer = 20;
             }
           }
@@ -683,6 +701,19 @@ function updatePlayer() {
   if (!(fury.active && player.dashing)) resolveCollisions();
   player.wasOnGround = wasOnGround;
   if (player.onGround) { player.dashing = false; player.dashTarget = null; player.homingUsed = false; player.airDashUsed = false; }
+
+  // re-apply underwater dash steering after collision so floor/wall zeroing doesn't eat diagonal velocity
+  if (player.groundDashing && player.inWater) {
+    const _dL = keys['KeyS'], _dR = keys['KeyC'], _dU = keys['KeyD'] || keys['KeyL'], _dD = keys['KeyX'];
+    if (_dL || _dR || _dU || _dD) {
+      const _dx = (_dL && !_dR) ? -1 : (_dR && !_dL) ? 1 : 0;
+      const _dy = (_dU && !_dD) ? -1 : (_dD && !_dU) ? 1 : 0;
+      const _len = Math.hypot(_dx, _dy) || 1;
+      const _spd = GROUND_DASH_SPEED * 0.6 + (GROUND_DASH_SPEED - GROUND_DASH_SPEED * 0.6) * player.groundDashFlash;
+      if (_dx !== 0) player.vx = (_dx / _len) * _spd;
+      if (_dy !== 0) player.vy = (_dy / _len) * _spd;
+    }
+  }
 
   cameraX += ((player.x - VIEW_W / 2 + player.w / 2) - cameraX) * 0.12;
   const targetY = Math.max(0, player.y - VIEW_H * 0.65 + player.h / 2);
@@ -782,6 +813,32 @@ function drawPlayer() {
   const swimBob = player.inWater ? Math.sin(player.swimBobPhase) * 2 : 0;
   const yOffset = (!player.onGround ? S.jumpYOffset : 0) + (player.groundDashing ? S.dashYOffset : 0) + dashJitter + swimBob;
   const py = bottom - sh + yOffset;
+
+  // draw kill text before hurt-blink return so it never flickers with the player sprite
+  if (player.killText) {
+    const kt = player.killText;
+    kt.timer--;
+    if (kt.timer <= 0) {
+      player.killText = null;
+    } else {
+      const progress = 1 - kt.timer / kt.maxTimer;
+      const floatY = Math.round(kt.y - cameraY - progress * 18);
+      const kx = Math.round(kt.x - cameraX);
+      ctx.save();
+      ctx.globalAlpha = 1;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      if (combo.count >= 2) {
+        ctx.font = '16px "Press Start 2P"';
+        ctx.fillStyle = combo.count >= 10 ? '#ff4400' : combo.count >= 5 ? '#ffaa00' : '#ffe866';
+        ctx.fillText(`x${combo.count}`, kx, floatY - 12);
+      }
+      ctx.font = PIXEL_FONT;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(kt.text, kx, floatY);
+      ctx.restore();
+    }
+  }
 
   // flicker during invincibility (not during fury — fury has its own flash)
   if (player.hurtTimer > 0 && !isFuryActive() && Math.floor(player.hurtTimer / 4) % 2 === 0) return;
@@ -1111,30 +1168,4 @@ function drawPlayer() {
   }
 
   // kill text floats up and fades
-  if (player.killText) {
-    const kt = player.killText;
-    kt.timer--;
-    if (kt.timer <= 0) {
-      player.killText = null;
-    } else {
-      const progress = 1 - kt.timer / 50;
-      const alpha = kt.timer / 50;
-      const floatY = Math.round(kt.y - cameraY - progress * 18);
-      const kx = Math.round(kt.x - cameraX);
-      ctx.save();
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      ctx.globalAlpha = alpha;
-      // combo count above hit text
-      if (combo.count >= 2) {
-        ctx.font = '16px "Press Start 2P"';
-        ctx.fillStyle = combo.count >= 10 ? '#ff4400' : combo.count >= 5 ? '#ffaa00' : '#ffe866';
-        ctx.fillText(`x${combo.count}`, kx, floatY - 12);
-      }
-      ctx.font = PIXEL_FONT;
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(kt.text, kx, floatY);
-      ctx.restore();
-    }
-  }
 }

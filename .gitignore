@@ -1,0 +1,6 @@
+.aider*
+
+# ignore everything except the retro game folder
+/*
+!/retro/
+!.gitignore

@@ -40,7 +40,7 @@ function makeRedEnemy(x, patrolLeft, patrolRight, platformY) {
     w: 0, h: 0,
     get y() {
       if (this.carried) {
-        const jumpExtra = player.onGround ? 0 : S.carryJumpY;
+        const jumpExtra = player.onGround ? 0 : (player.facingLeft ? S.carryJumpYL : S.carryJumpYR);
         return player.y - this.h + S.carryOffset + jumpExtra;
       }
       if (this.flipped || this.thrown) return this._y;
@@ -118,7 +118,18 @@ function updateRedEnemies() {
       e.frameTimer++;
       if (e.frameTimer >= 10) { e.frameTimer = 0; e.frame = (e.frame + 1) % 2; }
       const xOff = player.facingLeft ? S.carryOffsetL : S.carryOffsetR;
-      e.x = player.x + player.w / 2 - e.w / 2 + xOff;
+      const jumpXOff = player.onGround ? 0 : (player.facingLeft ? S.carryJumpXL : S.carryJumpXR);
+      e.x = player.x + player.w / 2 - e.w / 2 + xOff + jumpXOff;
+      // die if dragged into water
+      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
+      const inWater1 = ecx >= WATER_ZONE.x && ecx <= WATER_ZONE.x + WATER_ZONE.w && ecy >= WATER_ZONE.y && ecy <= WATER_ZONE.y + WATER_ZONE.h;
+      const inWater2 = ecx >= WATER_ZONE_2.x && ecx <= WATER_ZONE_2.x + WATER_ZONE_2.w && ecy >= WATER_ZONE_2.y && ecy <= WATER_ZONE_2.y + WATER_ZONE_2.h;
+      if (inWater1 || inWater2) {
+        e.dead = true; spawnDeathStars(e);
+        player.carrying = null;
+        registerKill();
+        continue;
+      }
       // touching a normal enemy while carried kills both
       for (const ne of enemies) {
         if (ne.dead) continue;
@@ -237,7 +248,7 @@ function drawRedEnemy(e) {
   if (!rSpr1.naturalWidth) return;
 
   const drawY = e.carried
-    ? (player.y - e.h + S.carryOffset + (player.onGround ? 0 : S.carryJumpY))
+    ? (player.y - e.h + S.carryOffset + (player.onGround ? 0 : (player.facingLeft ? S.carryJumpYL : S.carryJumpYR)))
     : (e.flipped ? e._y + S.flippedGndY : (e.flipping || e.thrown) ? e._y : e.y);
   const sx = Math.round(e.x - cameraX);
   const sy = Math.round(drawY - cameraY);
@@ -434,14 +445,14 @@ function updateFish() {
     if (e.deathFlash > 0) e.deathFlash--;
 
     if (e.dead) {
+      if (e.dart) { continue; } // dartfish never respawn
       if (e.respawnTimer > 0) { e.respawnTimer--; continue; }
       const distFromPlayer = Math.abs(e.startX - (player.x + player.w / 2));
       if (distFromPlayer > VIEW_W) {
         e.x = e.startX; e.y = e.startY;
-        e.vx = e.dart ? 2.2 : 0.7; e.vy = 0;
+        e.vx = 0.7; e.vy = 0;
         e.hp = 1; e.dead = false;
         e.hitFlash = 0; e.deathFlash = 0; e.particles = [];
-        if (e.dart) { e.darting = false; e.dartTimer = 0; e.dartVx = 0; e.dartVy = 0; e.dartProximity = 0; }
         e.respawnTimer = 0;
       }
       continue;
