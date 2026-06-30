@@ -25,6 +25,7 @@ function loop() {
     drawOrange(); drawGoldenKey();
     drawPlayer();
     drawCarriedRedEnemies();
+    tickAndDrawMarioDeathArcs();
     drawDialog();
     drawSettings();
     drawHUD();
@@ -126,6 +127,7 @@ function loop() {
   drawGoldenKey();
   drawPlayer();
   drawCarriedRedEnemies();
+  tickAndDrawMarioDeathArcs();
 
   if (screenShakeTimer > 0 || shakeX !== 0 || shakeY !== 0) ctx.restore();
 

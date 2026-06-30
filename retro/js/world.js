@@ -247,8 +247,9 @@ function drawBg() {
   if (!_bgOC) {
     _bgOC = getOC('bg_grad', VIEW_W, VIEW_H);
     const g = _bgOC._ctx.createLinearGradient(0, 0, 0, VIEW_H);
-    g.addColorStop(0, '#0d0521');
-    g.addColorStop(1, '#1a0a3e');
+    g.addColorStop(0, '#1a0a3a');
+    g.addColorStop(0.5, '#2a1255');
+    g.addColorStop(1, '#3a1a6e');
     _bgOC._ctx.fillStyle = g;
     _bgOC._ctx.fillRect(0, 0, VIEW_W, VIEW_H);
   }

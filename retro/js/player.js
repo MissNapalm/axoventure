@@ -10,6 +10,8 @@ const player = {
   facingLeft: false,
   frame: 0,
   frameTimer: 0,
+  idleFrame: 0,
+  idleTimer: 0,
   moving: false,
   dashing: false,
   dashTarget: null,
@@ -56,6 +58,7 @@ function resetLevel() {
   player.hurtTimer = 0;
   player.dashing = false; player.dashTarget = null;
   player.homingWindup = 0; player.homingWindupTarget = null;
+  marioDeathArcs.length = 0;
   player.shockwaves = [];
   player.sparks = [];
   player.impactFlash = 0;
@@ -915,6 +918,7 @@ function updatePlayer() {
   } else {
     player.frame = 0; player.frameTimer = 0;
   }
+
 }
 
 function drawPlayer() {
@@ -997,12 +1001,8 @@ function drawPlayer() {
   const dashJitter = player.groundDashing ? (Math.random() < 0.15 ? 1 : 0) : 0;
   const swimBob = player.inWater ? Math.sin(player.swimBobPhase) * 2 : 0;
   // walk frame height correction: pin top of visible content across frames of different heights
-  const _walkHeights = { walk1: 28, walk2: 27, walk3: 26, walk4: 26 };
-  const _maxWalkH = 28;
-  const _walkKey = WALK_SEQ[player.frame % WALK_SEQ.length];
-  const _walkCorr = (player.moving && player.onGround && _walkHeights[_walkKey]) ? (_maxWalkH - _walkHeights[_walkKey]) : 0;
-  const yOffset = (!player.onGround ? S.jumpYOffset : 0) + (player.groundDashing ? S.dashYOffset : 0) + dashJitter + swimBob - _walkCorr;
-  const py = Math.max(0, bottom - sh + yOffset);
+  const yOffset = (!player.onGround ? S.jumpYOffset : 0) + (player.groundDashing ? S.dashYOffset : 0) + (player.moving && player.onGround ? S.runYOffset : 0) + dashJitter + swimBob;
+  const py = Math.round(Math.max(0, bottom - sh + yOffset));
 
   // draw kill text before hurt-blink return so it never flickers with the player sprite
   if (player.killText) {
@@ -1132,10 +1132,8 @@ function drawPlayer() {
               : isSwimming ? (facingLeft ? S.shadesSwimYL : S.shadesSwimYR)
               : oy;
     // walk frame eye-height correction: sprite heights differ (28,27,26,26) so anchor from bottom shifts
-    const _walkYCorr = [2, 1, 0, 0];
-    const walkCorr = player.moving && player.onGround ? (_walkYCorr[player.frame % 4] || 0) : 0;
     const fsdx = facingLeft ? px + fox : px + (sw - shd.naturalWidth) - fox;
-    const fsdy = (py + sh) - foy - shd.naturalHeight + walkCorr;
+    const fsdy = (py + sh) - foy - shd.naturalHeight;
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     if (!facingLeft) {

@@ -25,24 +25,15 @@ function makeBranchSet(cx, cy, forkChance, biasX, stepDX, stepDY, maxY, forkStep
 }
 
 function makeBolt(x) {
-  const style = Math.floor(Math.random() * 4);
-
-  if (style === 0) {
-    return makeBranchSet(x, 0, 0.25, 0, 3, 5, VIEW_H * 0.85, 3);
-
-  } else if (style === 1) {
-    const main  = makeBranchSet(x,     0, 0.45, 0, 5, 4, VIEW_H * 0.8,  4);
-    const extra = makeBranchSet(x + 6, 0, 0.3,  2, 4, 5, VIEW_H * 0.5,  2);
-    return { segs: main.segs, branches: [...main.branches, ...extra.segs, ...extra.branches] };
-
-  } else if (style === 2) {
-    return makeBranchSet(x, 0, 0.05, 0, 1, 8, VIEW_H * 0.9, 1);
-
-  } else {
-    const left  = makeBranchSet(x, 0, 0.2, -1, 3, 5, VIEW_H * 0.75, 2);
-    const right = makeBranchSet(x, 0, 0.2,  1, 3, 5, VIEW_H * 0.75, 2);
-    return { segs: left.segs, branches: [...left.branches, ...right.segs, ...right.branches] };
+  const count = Math.floor(Math.random() * 2) + 1; // 1 or 2 trunks
+  const offsets = count === 1 ? [0] : [-6, 6];
+  let segs = [], branches = [];
+  for (const ox of offsets) {
+    const b = makeBranchSet(x + ox, -VIEW_H, 0.45, ox < 0 ? -1 : ox > 0 ? 1 : 0, 3, 5, VIEW_H * 1.7, 4);
+    segs = [...segs, ...b.segs];
+    branches = [...branches, ...b.branches];
   }
+  return { segs, branches };
 }
 
 function triggerLightning(screenX) {

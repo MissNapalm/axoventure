@@ -156,8 +156,8 @@ function updateRedEnemies() {
         const ox = Math.min(e.x + e.w, ne.x + ne.w) - Math.max(e.x, ne.x);
         const oy = Math.min(e.y + e.h, ne.y + ne.h) - Math.max(e.y, ne.y);
         if (ox > 0 && oy > 0) {
-          ne.dead = true; spawnDeathStars(ne);
-          e.dead = true; spawnDeathStars(e);
+          spawnMarioDeathArc(ne); ne.dead = true;
+          spawnMarioDeathArc(e);  e.dead = true;
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
           player.carrying = null;
@@ -228,8 +228,8 @@ function updateRedEnemies() {
         const ox = Math.min(_rsx2, ne.x + ne.w) - Math.max(_rsx1, ne.x);
         const oy = Math.min(_rsy2, ne.y + ne.h) - Math.max(_rsy1, ne.y);
         if (ox > 0 && oy > 0) {
-          ne.dead = true; spawnDeathStars(ne);
-          e.dead  = true; spawnDeathStars(e);
+          spawnMarioDeathArc(ne); ne.dead = true;
+          spawnMarioDeathArc(e);  e.dead  = true;
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
           player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
@@ -245,8 +245,8 @@ function updateRedEnemies() {
         const ox = Math.min(_rsx2, ne.x + ne.w) - Math.max(_rsx1, ne.x);
         const oy = Math.min(_rsy2, ney + ne.h) - Math.max(_rsy1, ney);
         if (ox > 0 && oy > 0) {
-          ne.dead = true; spawnDeathStars(ne);
-          e.dead  = true; spawnDeathStars(e);
+          spawnMarioDeathArc(ne); ne.dead = true;
+          spawnMarioDeathArc(e);  e.dead  = true;
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
           player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
@@ -1203,8 +1203,8 @@ function updateEnemies() {
         const rey = re.y, rox = Math.min(_sx2, re.x + re.w) - Math.max(_sx1, re.x);
         const roy = Math.min(_sy2, rey + re.h) - Math.max(_sy1, rey);
         if (rox > 0 && roy > 0) {
-          re.dead = true; spawnDeathStars(re);
-          e.dead  = true; spawnDeathStars(e);
+          spawnMarioDeathArc(re); re.dead = true;
+          spawnMarioDeathArc(e);  e.dead  = true;
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
           player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
@@ -1219,8 +1219,8 @@ function updateEnemies() {
         const ney = ne.y, nox = Math.min(_sx2, ne.x + ne.w) - Math.max(_sx1, ne.x);
         const noy = Math.min(_sy2, ney + ne.h) - Math.max(_sy1, ney);
         if (nox > 0 && noy > 0) {
-          ne.dead = true; spawnDeathStars(ne);
-          e.dead  = true; spawnDeathStars(e);
+          spawnMarioDeathArc(ne); ne.dead = true;
+          spawnMarioDeathArc(e);  e.dead  = true;
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
           player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
@@ -1343,6 +1343,45 @@ function updateEnemies() {
       if (ox > 0 && oy > 0 && player.hurtTimer === 0) hurtPlayer();
     }
   }
+}
+
+// Mario-style death arcs — enemies that pop up and fall off screen after a throw kill
+const marioDeathArcs = [];
+
+function spawnMarioDeathArc(e) {
+  const x = (e._y !== undefined && (e.thrown || e.flipping || e.flipped)) ? e.x : e.x;
+  const y = (e._y !== undefined && (e.thrown || e.flipping || e.flipped)) ? e._y : e.y;
+  marioDeathArcs.push({
+    x, y,
+    vx: (Math.random() - 0.5) * 1.5,
+    vy: -(6 + Math.random() * 2),
+    gravity: 0.3,
+    sprKey: e.red ? 'redguy1' : 'badguy1',
+    w: e.w, h: e.h,
+  });
+}
+
+function tickAndDrawMarioDeathArcs() {
+  let _n = 0;
+  for (let i = 0; i < marioDeathArcs.length; i++) {
+    const a = marioDeathArcs[i];
+    a.vy += a.gravity;
+    a.x  += a.vx;
+    a.y  += a.vy;
+    if (a.y - cameraY > VIEW_H + 60) continue; // off screen, discard
+    const spr = sprites[a.sprKey];
+    if (!spr || !spr.naturalWidth) { marioDeathArcs[_n++] = a; continue; }
+    const sx = Math.round(a.x - cameraX);
+    const sy = Math.round(a.y - cameraY);
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.translate(sx + a.w / 2, sy + a.h / 2);
+    ctx.scale(1, -1); // upside down, no spin
+    ctx.drawImage(spr, -a.w / 2, -a.h / 2, a.w, a.h);
+    ctx.restore();
+    marioDeathArcs[_n++] = a;
+  }
+  marioDeathArcs.length = _n;
 }
 
 function drawParticles(particles) {
