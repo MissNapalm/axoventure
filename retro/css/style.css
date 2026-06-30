@@ -9,6 +9,11 @@ body {
   overflow: hidden;
 }
 
+#game-wrap {
+  display: block;
+  line-height: 0;
+}
+
 canvas {
   display: block;
   image-rendering: pixelated;

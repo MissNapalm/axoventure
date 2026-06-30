@@ -16,46 +16,47 @@ const death = {
 };
 
 // Water zone: player swims freely inside this rectangle
-const WATER_ZONE = { x: 1700, y: 230, w: 2540, h: 600 };
+const WORLD_OFFSET_Y = 250;
+const WATER_ZONE = { x: 1700, y: 230 + WORLD_OFFSET_Y, w: 2540, h: 600 };
 // The seafloor/rock shelf that closes the bottom
 const WATER_FLOOR_Y = WATER_ZONE.y + WATER_ZONE.h;
 
 // Second land section ground level
-const LAND2_Y = 210;
+const LAND2_Y = 210 + WORLD_OFFSET_Y;
 
 // Second water zone: deep pool Edgar sits next to — swimmable, orange guarded at the bottom
-const WATER_ZONE_2 = { x: 4480, y: 230, w: 500, h: 700 };
+const WATER_ZONE_2 = { x: 4480, y: 230 + WORLD_OFFSET_Y, w: 500, h: 700 };
 const WATER_FLOOR_Y_2 = WATER_ZONE_2.y + WATER_ZONE_2.h;
 
 const platforms = [
   // upper ground (original section)
-  { x: -200, y: 210, w: 1900, h: 400, color: '#3d2b1f' },
+  { x: -200, y: 210 + WORLD_OFFSET_Y, w: 1900, h: 400, color: '#3d2b1f' },
   // fill the 20px notch where land meets water zone wall
-  { x: 1700, y: 210, w: 40, h: 20, color: '#3d2b1f' },
+  { x: 1700, y: 210 + WORLD_OFFSET_Y, w: 40, h: 20, color: '#3d2b1f' },
   // floating platforms (original)
-  { x: 80,   y: 155, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 230,  y: 135, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 370,  y: 115, w: 100, h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 500,  y: 145, w: 120, h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 650,  y: 120, w: 105, h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 790,  y:  95, w: 100, h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 920,  y: 128, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 1060, y: 105, w: 105, h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 1200, y: 135, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 1340, y: 110, w: 120, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 80,   y: 155 + WORLD_OFFSET_Y, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 230,  y: 135 + WORLD_OFFSET_Y, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 370,  y: 115 + WORLD_OFFSET_Y, w: 100, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 500,  y: 145 + WORLD_OFFSET_Y, w: 120, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 650,  y: 120 + WORLD_OFFSET_Y, w: 105, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 790,  y:  95 + WORLD_OFFSET_Y, w: 100, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 920,  y: 128 + WORLD_OFFSET_Y, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 1060, y: 105 + WORLD_OFFSET_Y, w: 105, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 1200, y: 135 + WORLD_OFFSET_Y, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 1340, y: 110 + WORLD_OFFSET_Y, w: 120, h: 8,  color: '#5c3d2e', oneWay: true },
   // step-down ledges leading into the water
-  { x: 1700, y: 235, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
-  { x: 1820, y: 260, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 1700, y: 235 + WORLD_OFFSET_Y, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
+  { x: 1820, y: 260 + WORLD_OFFSET_Y, w: 110, h: 8,  color: '#5c3d2e', oneWay: true },
   // seafloor solid rock — closes the bottom of the water zone
   { x: WATER_ZONE.x, y: WATER_FLOOR_Y, w: WATER_ZONE.w, h: 80, color: '#1a1a2e' },
   // underwater rock shelves / ledges
-  { x: 1850, y: 620, w: 120, h: 8,  color: '#1e2a3a', oneWay: true },
-  { x: 2050, y: 560, w: 100, h: 8,  color: '#1e2a3a', oneWay: true },
-  { x: 2220, y: 500, w: 110, h: 8,  color: '#1e2a3a', oneWay: true },
-  { x: 2400, y: 570, w: 90,  h: 8,  color: '#1e2a3a', oneWay: true },
-  { x: 2580, y: 520, w: 100, h: 8,  color: '#1e2a3a', oneWay: true },
-  { x: 2760, y: 590, w: 110, h: 8,  color: '#1e2a3a', oneWay: true },
-  { x: 2940, y: 540, w: 90,  h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 1850, y: 620 + WORLD_OFFSET_Y, w: 120, h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 2050, y: 560 + WORLD_OFFSET_Y, w: 100, h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 2220, y: 500 + WORLD_OFFSET_Y, w: 110, h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 2400, y: 570 + WORLD_OFFSET_Y, w: 90,  h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 2580, y: 520 + WORLD_OFFSET_Y, w: 100, h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 2760, y: 590 + WORLD_OFFSET_Y, w: 110, h: 8,  color: '#1e2a3a', oneWay: true },
+  { x: 2940, y: 540 + WORLD_OFFSET_Y, w: 90,  h: 8,  color: '#1e2a3a', oneWay: true },
   // right wall closing the water zone
   { x: WATER_ZONE.x + WATER_ZONE.w, y: WATER_ZONE.y, w: 40, h: WATER_ZONE.h + 80, color: '#1a1a2e' },
 
@@ -253,6 +254,12 @@ function drawBg() {
   }
   ctx.drawImage(_bgOC, 0, 0);
 
+  // in BW mode overlay a light grey to lift the dark sky
+  if (typeof gameboyMode !== 'undefined' && gameboyMode) {
+    ctx.fillStyle = 'rgba(180,180,180,0.72)';
+    ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  }
+
   // stars — update alpha at ~15fps, bake into offscreen
   const starTick = Math.floor(frameNow / 66);
   if (starTick !== _starFrame) {
@@ -290,12 +297,14 @@ function drawBg() {
   }
   ctx.globalAlpha = 1;
 
-  // clouds — blit pre-baked cloud sprites
-  for (let i = 0; i < clouds.length; i++) {
-    const c = clouds[i];
-    const oc = _cloudOCs[i];
-    const cx = ((c.x - cameraX * c.speed) % WORLD_W + WORLD_W) % WORLD_W;
-    ctx.drawImage(oc, Math.round(cx - oc._cw / 2), Math.round(c.y - 10));
+  // clouds — blit pre-baked cloud sprites (hidden in BW mode)
+  if (!(typeof gameboyMode !== 'undefined' && gameboyMode)) {
+    for (let i = 0; i < clouds.length; i++) {
+      const c = clouds[i];
+      const oc = _cloudOCs[i];
+      const cx = ((c.x - cameraX * c.speed) % WORLD_W + WORLD_W) % WORLD_W;
+      ctx.drawImage(oc, Math.round(cx - oc._cw / 2), Math.round(c.y - 10));
+    }
   }
 }
 

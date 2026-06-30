@@ -2,8 +2,17 @@ const keys = {};
 const keysConsumed = {};
 const keysLastHeld = {}; // timestamp of last keydown for each key
 
+let gameboyMode = false;
 window.addEventListener('keydown', e => {
   if (e.code === 'Tab') { e.preventDefault(); settingsOpen = !settingsOpen; return; }
+  if (e.code === 'KeyR') {
+    gameboyMode = !gameboyMode;
+    const wrap = document.getElementById('game-wrap');
+    wrap.style.filter = gameboyMode
+      ? 'grayscale(1) contrast(1.2) brightness(1.0)'
+      : '';
+    return;
+  }
   if (!keys[e.code]) keysConsumed[e.code] = false;
   keys[e.code] = true;
   keysLastHeld[e.code] = performance.now();

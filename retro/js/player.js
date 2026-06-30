@@ -1,4 +1,4 @@
-const PLAYER_START = { x: -100, y: 170 };
+const PLAYER_START = { x: -100, y: 420 };
 
 let coderMode = false;
 
@@ -173,6 +173,8 @@ function resolveCollisions() {
         player.vy = 0;
       }
     } else {
+      // during upward ground dash or homing dash, skip all solid platform collision so player passes through
+      if ((player.groundDashing && !player.inWater && player.vy < 0) || (player.dashing && player.vy < 0)) continue;
       if (ox < oy) {
         if (player.x < p.x) player.x -= ox; else player.x += ox;
         player.vx = 0;
@@ -498,7 +500,12 @@ function updatePlayer() {
   }
   if (player.groundDashing) {
     player.groundDashTimer--;
-    if (player.groundDashTimer <= 0) { player.groundDashing = false; player.groundDashFlash = 0; player.vx *= 0.3; }
+    if (player.groundDashTimer <= 0) {
+      player.groundDashing = false; player.groundDashFlash = 0;
+      player.vx *= 0.3;
+      // preserve upward momentum so the player doesn't abruptly stop mid-air
+      if (player.vy < 0) player.vy *= 0.7;
+    }
   }
   if (player.groundDashFlash > 0) player.groundDashFlash = Math.max(0, player.groundDashFlash - 0.06);
 
@@ -989,8 +996,13 @@ function drawPlayer() {
   const sh = sprite.naturalHeight;
   const dashJitter = player.groundDashing ? (Math.random() < 0.15 ? 1 : 0) : 0;
   const swimBob = player.inWater ? Math.sin(player.swimBobPhase) * 2 : 0;
-  const yOffset = (!player.onGround ? S.jumpYOffset : 0) + (player.groundDashing ? S.dashYOffset : 0) + dashJitter + swimBob;
-  const py = bottom - sh + yOffset;
+  // walk frame height correction: pin top of visible content across frames of different heights
+  const _walkHeights = { walk1: 28, walk2: 27, walk3: 26, walk4: 26 };
+  const _maxWalkH = 28;
+  const _walkKey = WALK_SEQ[player.frame % WALK_SEQ.length];
+  const _walkCorr = (player.moving && player.onGround && _walkHeights[_walkKey]) ? (_maxWalkH - _walkHeights[_walkKey]) : 0;
+  const yOffset = (!player.onGround ? S.jumpYOffset : 0) + (player.groundDashing ? S.dashYOffset : 0) + dashJitter + swimBob - _walkCorr;
+  const py = Math.max(0, bottom - sh + yOffset);
 
   // draw kill text before hurt-blink return so it never flickers with the player sprite
   if (player.killText) {

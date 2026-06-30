@@ -4,7 +4,7 @@ const ctx    = canvas.getContext('2d');
 const SCALE   = 3;
 const VIEW_W  = 480;
 const VIEW_H  = 270;
-const GROUND_Y = 210;
+const GROUND_Y = 460;
 
 const PIXEL_FONT    = '8px "Press Start 2P"';
 const PIXEL_FONT_SM = '8px "Press Start 2P"';

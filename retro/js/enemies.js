@@ -11,6 +11,7 @@ function makeEnemy(x, patrolLeft, patrolRight, platformY) {
     },
     _y: 0,
     platformY,
+    startPlatformY: platformY,
     patrolSpeed: 0.8,
     vx: 0.8,
     vy: 0,
@@ -36,11 +37,11 @@ function makeEnemy(x, patrolLeft, patrolRight, platformY) {
 
 const enemies = [
   // upper section — platformY = platform.y (top surface; getter returns platformY - h)
-  makeEnemy(100,   80,  190, 155),
-  makeEnemy(530,  500,  620, 145),
-  makeEnemy(680,  650,  755, 120),
-  makeEnemy(950,  920, 1030, 128),
-  makeEnemy(1230, 1200, 1310, 135),
+  makeEnemy(100,   80,  190, 405),
+  makeEnemy(530,  500,  620, 395),
+  makeEnemy(680,  650,  755, 370),
+  makeEnemy(950,  920, 1030, 378),
+  makeEnemy(1230, 1200, 1310, 385),
 ];
 
 function makeRedEnemy(x, patrolLeft, patrolRight, platformY) {
@@ -58,6 +59,7 @@ function makeRedEnemy(x, patrolLeft, patrolRight, platformY) {
     },
     _y: 0,
     platformY,
+    startPlatformY: platformY,
     patrolSpeed: 0.5,
     vx: 0.5, vy: 0,
     patrolLeft, patrolRight,
@@ -122,11 +124,12 @@ function updateRedEnemies() {
     if (e.dead) {
       const dist = Math.abs((e.startX + e.w / 2) - (player.x + player.w / 2));
       if (dist > VIEW_W) {
-        e.x = e.startX; e._y = e.platformY - e.h;
+        e.x = e.startX; e.platformY = e.startPlatformY; e._y = e.startPlatformY - e.h;
         e.vx = e.patrolSpeed; e.vy = 0;
-        e.dead = false; e.flipped = false; e.flippedTimer = 0; e.flipping = false; e.carried = false; e.thrown = false;
-        e.hitFlash = 0; e.frame = 0; e.frameTimer = 0; e.throwAngle = 0;
+        e.flipped = false; e.flippedTimer = 0; e.flipping = false; e.carried = false; e.thrown = false;
+        e.hitFlash = 0; e.deathFlash = 0; e.frame = 0; e.frameTimer = 0; e.throwAngle = 0;
         e.jitterX = 0; e.jitterY = 0; e.jitterTimer = 0; e.particles = [];
+        e.dead = false; // set last so draw skip holds until fully reset
       }
       continue;
     }
@@ -183,20 +186,22 @@ function updateRedEnemies() {
         const ox = Math.min(e.x + e.w, p.x + p.w) - Math.max(e.x, p.x);
         if (ox <= 0) continue;
         const prevBottom = e._y + e.h - e.vy;
-        if (e.vy > 0 && prevBottom <= p.y + 1 && e._y + e.h >= p.y) {
+        if (e.vy > 0 && prevBottom <= p.y && e._y + e.h >= p.y) {
           e._y = p.y - e.h;
           e.flipping = false;
           e.flipped = true; e.flippedTimer = 0;
           e.vy = 0; e.throwAngle = 0;
+          e.platformY = p.y;
           flippingLanded = true;
           break;
         }
       }
-      if (!flippingLanded && e._y + e.h >= e.platformY) {
-        e._y = e.platformY - e.h;
+      if (!flippingLanded && e._y + e.h >= GROUND_Y) {
+        e._y = GROUND_Y - e.h;
         e.flipping = false;
         e.flipped = true; e.flippedTimer = 0;
         e.vy = 0; e.throwAngle = 0;
+        e.platformY = GROUND_Y;
       }
       continue;
     }
@@ -204,6 +209,7 @@ function updateRedEnemies() {
     if (e.thrown) {
       e.throwAngle += e.vx * 0.07;
       e.vy += 0.25;
+      const _rpx = e.x, _rpy = e._y;
       e.x  += e.vx;
       e._y += e.vy;
 
@@ -213,18 +219,38 @@ function updateRedEnemies() {
                  || (_tr > WATER_ZONE_2.x && _tl < WATER_ZONE_2.x + WATER_ZONE_2.w && _tb > WATER_ZONE_2.y);
       if (_inWZ) { e.dead = true; spawnDeathStars(e); if (player.carrying === e) player.carrying = null; registerKill(); continue; }
 
-      // check collision with normal enemies
+      // swept bounding box for collision
+      const _rsx1 = Math.min(_rpx, e.x), _rsx2 = Math.max(_rpx + e.w, e.x + e.w);
+      const _rsy1 = Math.min(_rpy, e._y), _rsy2 = Math.max(_rpy + e.h, e._y + e.h);
+      // check collision with blue enemies
       for (const ne of enemies) {
         if (ne.dead) continue;
-        const ox = Math.min(e.x + e.w, ne.x + ne.w) - Math.max(e.x, ne.x);
-        const oy = Math.min(e._y + e.h, ne.y + ne.h) - Math.max(e._y, ne.y);
+        const ox = Math.min(_rsx2, ne.x + ne.w) - Math.max(_rsx1, ne.x);
+        const oy = Math.min(_rsy2, ne.y + ne.h) - Math.max(_rsy1, ne.y);
         if (ox > 0 && oy > 0) {
           ne.dead = true; spawnDeathStars(ne);
           e.dead  = true; spawnDeathStars(e);
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
           player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
-          registerKill();
+          registerKill(); registerKill();
+          break;
+        }
+      }
+      if (e.dead) continue;
+      // check collision with other red enemies
+      for (const ne of redEnemies) {
+        if (ne === e || ne.dead || ne.carried || ne.thrown || ne.flipping) continue;
+        const ney = ne.y;
+        const ox = Math.min(_rsx2, ne.x + ne.w) - Math.max(_rsx1, ne.x);
+        const oy = Math.min(_rsy2, ney + ne.h) - Math.max(_rsy1, ney);
+        if (ox > 0 && oy > 0) {
+          ne.dead = true; spawnDeathStars(ne);
+          e.dead  = true; spawnDeathStars(e);
+          triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
+          screenShakeTimer = 6;
+          player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
+          registerKill(); registerKill();
           break;
         }
       }
@@ -235,7 +261,7 @@ function updateRedEnemies() {
         const ox = Math.min(e.x + e.w, p.x + p.w) - Math.max(e.x, p.x);
         if (ox <= 0) continue;
         const prevBottom = e._y + e.h - e.vy;
-        if (e.vy > 0 && prevBottom <= p.y + 1 && e._y + e.h >= p.y) {
+        if (e.vy > 0 && prevBottom <= p.y && e._y + e.h >= p.y) {
           e._y = p.y - e.h;
           e.vy *= -0.5;
           e.vx *= 0.85;
@@ -243,12 +269,12 @@ function updateRedEnemies() {
         }
       }
 
-      // hit ground — bounce and settle into flipped state
-      if (e._y + e.h >= e.platformY) {
-        e._y = e.platformY - e.h;
+      // hit ground floor — bounce and settle into flipped state
+      if (e._y + e.h >= GROUND_Y) {
+        e._y = GROUND_Y - e.h;
         e.vy *= -0.45;
         e.vx *= 0.8;
-        if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; }
+        if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; e.platformY = GROUND_Y; }
       }
       continue;
     }
@@ -300,8 +326,9 @@ function updateRedEnemies() {
 
     // contact with player: dashing/homing handled elsewhere, walking hurts Axo (fury blocks damage)
     if (!player.dashing && !player.groundDashing && !fury.active) {
+      const ey = e.y; // use getter so patrol enemies resolve platformY - h correctly
       const ox = Math.min(player.x + player.w, e.x + e.w) - Math.max(player.x, e.x);
-      const oy = Math.min(player.y + player.h, e._y + e.h) - Math.max(player.y, e._y);
+      const oy = Math.min(player.y + player.h, ey + e.h) - Math.max(player.y, ey);
       if (ox > 0 && oy > 0 && player.hurtTimer === 0) hurtPlayer();
     }
   }
@@ -430,6 +457,7 @@ function spawnDeathStars(e) {
 let _fishIdCounter = 0;
 
 function makeFish(x, y, swimLeft, swimRight) {
+  y += WORLD_OFFSET_Y;
   return {
     fish: true,
     _id: _fishIdCounter++,
@@ -731,6 +759,7 @@ const COOLDOWN_FRAMES = 60;
 const PATROL_TRIGGER_DIST = 130; // how close player must be to trigger windup
 
 function makeBigFish(x, y, swimLeft, swimRight) {
+  y += WORLD_OFFSET_Y;
   return {
     bigFish: true,
     x, startX: x,
@@ -1104,15 +1133,18 @@ function updateEnemies() {
         e.x = e.startX;
         e.vx = e.patrolSpeed;
         e.hp = 2;
-        e.dead = false;
         e.shakeTimer = 0;
         e.stunTimer = 0;
         e.hitFlash = 0;
+        e.deathFlash = 0;
+        e.hitTextTimer = 0;
         e.frame = 0; e.frameTimer = 0;
         e.particles = [];
         e.flipped = false; e.flipping = false; e.flippedTimer = 0;
         e.carried = false; e.thrown = false;
-        e._y = 0; e.vy = 0; e.throwAngle = 0;
+        e.platformY = e.startPlatformY; e._y = 0; e.vy = 0; e.throwAngle = 0;
+        e.lastHitBy = null;
+        e.dead = false; // set last so draw skip holds until fully reset
       }
       continue;
     }
@@ -1143,7 +1175,7 @@ function updateEnemies() {
       const xOff = player.facingLeft ? S.carryOffsetL : S.carryOffsetR;
       const jumpXOff = player.onGround ? 0 : (player.facingLeft ? S.carryJumpXL : S.carryJumpXR);
       e.x = player.x + player.w / 2 - e.w / 2 + xOff + jumpXOff;
-      e._y = player.y - e.h + S.carryOffset + (!player.onGround ? (player.facingLeft ? S.carryJumpYL : S.carryJumpYR) : 0);
+      e._y = player.y - e.h + S.blueCarryOffset + (!player.onGround ? (player.facingLeft ? S.carryJumpYL : S.carryJumpYR) : 0);
       e.frameTimer++;
       if (e.frameTimer >= 10) { e.frameTimer = 0; e.frame = (e.frame + 1) % 2; }
       continue;
@@ -1152,6 +1184,7 @@ function updateEnemies() {
     if (e.thrown) {
       e.throwAngle += e.vx * 0.07; // spin like red enemy
       e.vy += 0.25; // identical gravity to thrown red enemy
+      const _prevX = e.x, _prevY = e._y;
       e._y += e.vy;
       e.x  += e.vx;
       // animate while thrown
@@ -1161,12 +1194,15 @@ function updateEnemies() {
       const _fb2 = e._y + e.h > WATER_ZONE.y && e.x + e.w > WATER_ZONE.x && e.x < WATER_ZONE.x + WATER_ZONE.w;
       const _fb3 = e._y + e.h > WATER_ZONE_2.y && e.x + e.w > WATER_ZONE_2.x && e.x < WATER_ZONE_2.x + WATER_ZONE_2.w;
       if (_fb2 || _fb3 || e._y > 1200) { e.dead = true; spawnDeathStars(e); registerKill(); continue; }
-      // collision with red enemies — both die (only when moving toward them, not arcing away)
+      // swept bounding box: union of prev and current position catches fast-moving throws
+      const _sx1 = Math.min(_prevX, e.x), _sx2 = Math.max(_prevX + e.w, e.x + e.w);
+      const _sy1 = Math.min(_prevY, e._y), _sy2 = Math.max(_prevY + e.h, e._y + e.h);
+      // collision with red enemies
       for (const re of redEnemies) {
         if (re.dead || re.carried) continue;
-        const rox = Math.min(e.x + e.w, re.x + re.w) - Math.max(e.x, re.x);
-        const roy = Math.min(e._y + e.h, re.y + re.h) - Math.max(e._y, re.y);
-        if (rox > 0 && roy > 6) {
+        const rey = re.y, rox = Math.min(_sx2, re.x + re.w) - Math.max(_sx1, re.x);
+        const roy = Math.min(_sy2, rey + re.h) - Math.max(_sy1, rey);
+        if (rox > 0 && roy > 0) {
           re.dead = true; spawnDeathStars(re);
           e.dead  = true; spawnDeathStars(e);
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
@@ -1177,12 +1213,12 @@ function updateEnemies() {
         }
       }
       if (e.dead) continue;
-      // collision with other blue enemies — both die
+      // collision with other blue enemies
       for (const ne of enemies) {
         if (ne === e || ne.dead || ne.flipped || ne.carried || ne.thrown) continue;
-        const nox = Math.min(e.x + e.w, ne.x + ne.w) - Math.max(e.x, ne.x);
-        const noy = Math.min(e._y + e.h, ne.y + ne.h) - Math.max(e._y, ne.y);
-        if (nox > 0 && noy > 6) {
+        const ney = ne.y, nox = Math.min(_sx2, ne.x + ne.w) - Math.max(_sx1, ne.x);
+        const noy = Math.min(_sy2, ney + ne.h) - Math.max(_sy1, ney);
+        if (nox > 0 && noy > 0) {
           ne.dead = true; spawnDeathStars(ne);
           e.dead  = true; spawnDeathStars(e);
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
@@ -1197,7 +1233,8 @@ function updateEnemies() {
       for (const p of platforms) {
         if (p.oneWay && e.vy < 0) continue;
         const ox2 = Math.min(e.x + e.w, p.x + p.w) - Math.max(e.x, p.x);
-        if (ox2 > 0 && e._y + e.h >= p.y && e._y + e.h - e.vy <= p.y + 2) {
+        const prevBottom2 = e._y + e.h - e.vy;
+        if (ox2 > 0 && e.vy > 0 && prevBottom2 <= p.y && e._y + e.h >= p.y) {
           e._y = p.y - e.h; e.vy *= -0.5; e.vx *= 0.85;
           if (Math.abs(e.vy) < 1) { e.thrown = false; e.flipped = true; e.flippedTimer = 0; e.vx = 0; e.vy = 0; e.throwAngle = 0; e.platformY = p.y; }
           break;
@@ -1213,6 +1250,12 @@ function updateEnemies() {
     }
 
     if (e.flipped) {
+      // water kill — x-overlap only so elevated enemies also die
+      { const _fl = e.x, _fr = e.x + e.w;
+        const _hw1 = _fr > WATER_ZONE.x && _fl < WATER_ZONE.x + WATER_ZONE.w;
+        const _hw2 = _fr > WATER_ZONE_2.x && _fl < WATER_ZONE_2.x + WATER_ZONE_2.w;
+        if (_hw1 || _hw2) { e.dead = true; spawnDeathStars(e); if (player.carrying === e) player.carrying = null; registerKill(); continue; }
+      }
       e.flippedTimer++;
       // gravity + platform/ground landing — clamp to downward only so bounce setting can't push upward
       e.vy += S.redFlipGrav;
@@ -1276,6 +1319,14 @@ function updateEnemies() {
         if (probeX >= p.x && probeX <= p.x + p.w && probeY >= p.y && probeY <= p.y + p.h + 4) { hasGround = true; break; }
       }
       if (!hasGround) e.vx = -e.vx;
+    }
+
+    // kill wall over water — x-overlap only, so platform enemies above water also die
+    {
+      const _bl = e.x, _br = e.x + e.w;
+      const _hitsW1 = _br > WATER_ZONE.x && _bl < WATER_ZONE.x + WATER_ZONE.w;
+      const _hitsW2 = _br > WATER_ZONE_2.x && _bl < WATER_ZONE_2.x + WATER_ZONE_2.w;
+      if (_hitsW1 || _hitsW2) { e.dead = true; spawnDeathStars(e); if (player.carrying === e) player.carrying = null; registerKill(); continue; }
     }
 
     e.x += e.vx;
