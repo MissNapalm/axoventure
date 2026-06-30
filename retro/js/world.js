@@ -327,27 +327,46 @@ function drawRain() {
 
 const VINE_OVERFLOW = 16; // extra canvas height for hanging vines
 
+const TILE_SZ = 16;
+
+function _drawTile(fc, key, dx, dy, dw, dh) {
+  const img = sprites['tile_' + key];
+  if (!img || !img.naturalWidth) return;
+  fc.imageSmoothingEnabled = false;
+  for (let ty = 0; ty < dh; ty += TILE_SZ)
+    for (let tx = 0; tx < dw; tx += TILE_SZ)
+      fc.drawImage(img, dx + tx, dy + ty, Math.min(TILE_SZ, dw - tx), Math.min(TILE_SZ, dh - ty));
+}
+
+function _tileRow(fc, y, w, h, lKey, mKey, rKey) {
+  const T2 = TILE_SZ;
+  if (w <= T2 * 2) { _drawTile(fc, mKey, 0, y, w, h); return; }
+  _drawTile(fc, lKey, 0,       y, T2,       h);
+  _drawTile(fc, mKey, T2,      y, w - T2*2, h);
+  _drawTile(fc, rKey, w - T2,  y, T2,       h);
+}
+
 function _bakePlatform(p) {
   const isRock = p.color === '#1a1a2e' || p.color === '#1a2a3a' || p.color === '#1e2a3a';
   const isUnderwater = isRock && p.oneWay;
   const canvasH = (p.oneWay && !isRock) ? p.h + VINE_OVERFLOW : p.h;
   const oc = getOC('plat_' + p.x + '_' + p.y, p.w, canvasH);
   const fc = oc._ctx;
+  fc.imageSmoothingEnabled = false;
 
   if (isUnderwater) {
-    // underwater rock ledge
+    // underwater rock ledge — keep procedural
     fc.fillStyle = '#1c2e40'; fc.fillRect(0, 0, p.w, p.h);
     fc.fillStyle = '#243848';
     for (let rx = 0; rx < p.w; rx += 14) { fc.fillRect(rx, 0, 7, 2); fc.fillRect(rx + 5, 3, 5, 2); }
     fc.fillStyle = '#162230'; fc.fillRect(0, p.h - 2, p.w, 2);
-    // algae tufts on top
     fc.fillStyle = '#1a5a3a';
     for (let ax = 3; ax < p.w - 3; ax += 9) fc.fillRect(ax, 0, 2, 3);
     fc.fillStyle = '#228844';
     for (let ax = 6; ax < p.w - 6; ax += 11) fc.fillRect(ax, 0, 1, 4);
 
   } else if (isRock) {
-    // solid rock wall/floor
+    // solid rock — keep procedural
     fc.fillStyle = p.color; fc.fillRect(0, 0, p.w, p.h);
     fc.fillStyle = '#22334a';
     for (let ry = 4; ry < p.h; ry += 10)
@@ -357,93 +376,60 @@ function _bakePlatform(p) {
       for (let rx = 11; rx < p.w - 3; rx += 20) fc.fillRect(rx, ry, 6, 1);
 
   } else if (p.oneWay) {
-    // floating platform — wood plank top with grass and hanging vines
+    // floating platform — grass tiles on top, solid brown below
     const W = p.w, H = p.h;
+    const T2 = TILE_SZ;
+    if (H > T2) {
+      fc.fillStyle = '#3d1f0a';
+      fc.fillRect(0, T2, W, H - T2);
+    }
+    _tileRow(fc, 0, W, Math.min(T2, H), 'grassL', 'grassM', 'grassR');
 
-    // wood base
-    fc.fillStyle = '#6b4530'; fc.fillRect(0, 2, W, H - 2);
-    fc.fillStyle = '#5a3825'; fc.fillRect(0, H - 3, W, 3);
-
-    // plank grain lines
-    fc.fillStyle = '#7a5040';
-    for (let gx = 0; gx < W; gx += 10) { fc.fillRect(gx, 2, 1, H - 4); }
-    fc.fillStyle = '#4a2e18';
-    for (let gx = 5; gx < W; gx += 10) { fc.fillRect(gx, 3, 1, H - 5); }
-
-    // grass top strip
-    fc.fillStyle = '#3a8a28'; fc.fillRect(0, 0, W, 3);
-    fc.fillStyle = '#4eb034';
-    for (let gx = 2; gx < W - 2; gx += 5) fc.fillRect(gx, 0, 2, 2);
-    fc.fillStyle = '#6ed648';
-    for (let gx = 4; gx < W - 4; gx += 9) fc.fillRect(gx, 0, 1, 1);
-
-    // grass blades poking up (drawn within canvas, will overlap top of grass strip)
-    fc.fillStyle = '#55c038';
-    for (let gx = 3; gx < W - 3; gx += 7) { fc.fillRect(gx, 0, 1, 2); }
-    fc.fillStyle = '#3a8a28';
-    for (let gx = 6; gx < W - 6; gx += 11) { fc.fillRect(gx, 0, 1, 2); }
-
-    // hanging vines from bottom — deterministic using x position
+    // hanging vines
     const vineColors = ['#2a7a1a', '#1e6012', '#3a9a22', '#228818'];
-    let vx = 6;
-    let vi = 0;
+    let vx = 6, vi = 0;
     while (vx < W - 4) {
-      const vineLen = 6 + ((vx * 7 + vi * 13) % 10); // 6–15px
-      const col = vineColors[vi % vineColors.length];
-      fc.fillStyle = col;
-      // main vine stem
+      const vineLen = 6 + ((vx * 7 + vi * 13) % 10);
+      fc.fillStyle = vineColors[vi % vineColors.length];
       for (let vy = H; vy < H + vineLen; vy++) fc.fillRect(vx, vy, 1, 1);
-      // small leaf bumps
       if (vineLen > 8) {
         fc.fillStyle = '#44bb22';
         fc.fillRect(vx - 1, H + 4, 1, 1);
         fc.fillRect(vx + 1, H + 7, 1, 1);
       }
-      vx += 5 + ((vx * 3 + vi) % 6);
-      vi++;
+      vx += 5 + ((vx * 3 + vi) % 6); vi++;
     }
 
   } else {
-    // ground slab — layered soil with detailed grass top
-    const totalH = p.h;
-
-    // grass layer
-    fc.fillStyle = '#3a8a28'; fc.fillRect(0, 0, p.w, 4);
-    fc.fillStyle = '#4eb034';
-    for (let gx = 2; gx < p.w; gx += 5) fc.fillRect(gx, 0, 2, 3);
-    fc.fillStyle = '#6ed648';
-    for (let gx = 4; gx < p.w; gx += 9) fc.fillRect(gx, 0, 1, 2);
-    // grass blades
-    fc.fillStyle = '#55c038';
-    for (let gx = 3; gx < p.w - 2; gx += 7) fc.fillRect(gx, 0, 1, 2);
-    fc.fillStyle = '#3a8a28';
-    for (let gx = 7; gx < p.w - 4; gx += 13) fc.fillRect(gx, 0, 1, 2);
-
-    // topsoil
-    fc.fillStyle = '#7a4f2a'; fc.fillRect(0, 4, p.w, 8);
-    fc.fillStyle = '#8a5c32';
-    for (let dx = 6; dx < p.w - 6; dx += 16) fc.fillRect(dx, 5, 4, 2);
-
-    // mid dirt layers
-    fc.fillStyle = '#5c3a1e'; fc.fillRect(0, 12, p.w, 18);
-    fc.fillStyle = '#6b4526';
-    for (let dx = 3; dx < p.w - 3; dx += 20) { fc.fillRect(dx, 14, 6, 2); fc.fillRect(dx + 9, 22, 5, 2); }
-    fc.fillStyle = '#3d2410'; fc.fillRect(0, 30, p.w, 28);
-    // rock flecks
-    fc.fillStyle = '#2a1a0c';
-    for (let dx = 8; dx < p.w - 8; dx += 22) { fc.fillRect(dx, 35, 3, 2); fc.fillRect(dx + 10, 44, 4, 2); }
-
-    fc.fillStyle = '#2e1e10'; fc.fillRect(0, 58, p.w, 20);
-    fc.fillStyle = '#261808';
-    for (let dx = 5; dx < p.w - 5; dx += 18) fc.fillRect(dx, 62, 5, 3);
-
-    if (totalH > 78) {
-      fc.fillStyle = '#1a1e28'; fc.fillRect(0, 78, p.w, totalH - 78);
-      fc.fillStyle = '#1e2a3a';
-      for (let wy2 = 84; wy2 < totalH; wy2 += 10)
-        for (let wx2 = 4; wx2 < p.w - 4; wx2 += 18)
-          fc.fillRect(wx2, wy2, 7, 1);
+    // ground slab — deep tile pattern below, grass on top
+    const W = p.w, totalH = p.h;
+    const T2 = TILE_SZ;
+    // dirt fill for everything below grass row
+    const dirtImg = sprites['tile_dirtM'];
+    if (dirtImg && dirtImg.naturalWidth) {
+      fc.save();
+      fc.translate(0, T2);
+      const dirtPat = fc.createPattern(dirtImg, 'repeat');
+      fc.fillStyle = dirtPat;
+      fc.fillRect(0, 0, W, totalH - T2);
+      fc.restore();
+    } else {
+      fc.fillStyle = '#2e1608';
+      fc.fillRect(0, T2, W, totalH - T2);
     }
+    // one row of deep tiles just under grass (drawn on top of brownground)
+    const deepImg = sprites['tile_deepM'];
+    if (deepImg && deepImg.naturalWidth) {
+      const deepH = deepImg.naturalHeight;
+      fc.save();
+      fc.translate(0, T2);
+      const pat = fc.createPattern(deepImg, 'repeat');
+      fc.fillStyle = pat;
+      fc.fillRect(0, 0, W, deepH);
+      fc.restore();
+    }
+    // grass top row
+    _tileRow(fc, 0, W, T2, 'grassL', 'grassM', 'grassR');
   }
   p._oc = oc;
 }
