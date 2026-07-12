@@ -22,7 +22,7 @@ function loop() {
     ctx.clearRect(0, 0, VIEW_W, VIEW_H);
     drawBg(); drawLightning(); drawRain(); drawWater(); drawWater2(); drawPlatforms();
     drawNpcs(); drawEnemies(); drawRedEnemies(); drawFish(); drawBigFish();
-    drawOrange(); drawGoldenKey();
+    drawCoins(); drawOrange(); drawGoldenKey();
     drawPlayer();
     drawCarriedRedEnemies();
     tickAndDrawMarioDeathArcs();
@@ -123,7 +123,7 @@ function loop() {
   drawRedEnemies();
   drawFish();
   drawBigFish();
-  drawOrange();
+  drawCoins(); drawOrange();
   drawGoldenKey();
   drawPlayer();
   drawCarriedRedEnemies();

@@ -85,11 +85,12 @@ function resetLevel() {
   orange.collected = false;
   goldenKey.active = false;
   goldenKey.collected = false;
+  for (const c of coins) { c.collected = false; c.bobPhase = Math.random() * Math.PI * 2; }
   levelComplete = false;
   levelCompleteTimer = 0;
-  // reset Edwin sprite back to capy2
+  // reset Edwin sprite
   const edwinNpc = npcs.find(n => n.id === 'edwin');
-  if (edwinNpc) edwinNpc.sprite = 'capy2';
+  if (edwinNpc) edwinNpc.sprite = 'cap2';
   // reset big fish
   for (const e of bigFishEnemies) {
     e.x = e.startX; e.y = e.startY;
@@ -268,7 +269,7 @@ function updatePlayer() {
           const nx = dx / len;
           const ny = dy / len;
           const dashSpd = GROUND_DASH_SPEED;
-          playSound('homing');
+          playSound('dashandhoming');
           player.groundDashing = true;
           player.groundDashTimer = GROUND_DASH_FRAMES;
           player.groundDashFlash = 1;
@@ -469,16 +470,15 @@ function updatePlayer() {
 
   if (player.hurtTimer > 0) player.hurtTimer--;
   if (player.postDashTimer > 0) player.postDashTimer--;
-  // slow passive regen — only when not recently hurt, not at max
   if (player.hurtTimer === 0 && player.hp < PLAYER_MAX_HP) {
     player.hp = Math.min(PLAYER_MAX_HP, player.hp + 0.003);
   }
 
   if (player.killSpin > 0) player.killSpin--;
 
-  // Ground dash countdown — underwater: keep dashing while M held, steer with direction keys
-  if (player.groundDashing && player.inWater) {
-    if (keys['KeyM']) player.groundDashTimer = GROUND_DASH_FRAMES;
+  // Ground dash countdown — keep dashing indefinitely while M held: always in water, or anywhere during fury mode; steer with direction keys
+  if (player.groundDashing && (player.inWater || isFuryActive())) {
+    if (keys['KeyM'] && (player.inWater || isFuryActive())) player.groundDashTimer = GROUND_DASH_FRAMES;
     // burst speed fades to sustained speed as groundDashFlash decays
     const burstSpd = GROUND_DASH_SPEED;
     const sustainSpd = GROUND_DASH_SPEED * 0.6;
@@ -517,7 +517,7 @@ function updatePlayer() {
     player.homingWindup--;
     player.vx = 0; player.vy = 0;
     if (player.homingWindup === 0 && player.homingWindupTarget && !player.homingWindupTarget.dead) {
-      playSound('homing');
+      playSound('dashandhoming');
       player.dashing = true;
       player.dashTarget = player.homingWindupTarget;
       player.homingWindupTarget = null;
@@ -535,6 +535,7 @@ function updatePlayer() {
     if (player.groundPoundWindup === 0) {
       player.groundPounding = true;
       player.groundPoundSpin = 0; // reset so dive draws normally (no rotation)
+      playSound('groundpound');
       player.vy = 14;
       player.vx = 0;
     }
@@ -673,6 +674,7 @@ function updatePlayer() {
         hitFreezeTimer = HIT_FREEZE_FRAMES;
         spawnImpactVFX(impactX, impactY);
         player.killText = { text: 'HOMING HIT!', timer: 50, maxTimer: 50, x: impactX, y: impactY - 12 };
+        registerKill();
       } else {
         // spiked AND not freshly triggered by the player (lastHitBy===null means pre-existing spike)
         const spiked = e.stunTimer > 0 && e.lastHitBy === null && !isFuryActive();
@@ -730,8 +732,16 @@ function updatePlayer() {
               screenShakeTimer = 6;
               player.killSpin = 10;
               registerKill();
+            } else if (e.flipped) {
+              e.dead = true;
+              spawnMarioDeathArc(e);
+              triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
+              screenShakeTimer = 6;
+              player.killSpin = 10;
+              registerKill();
             } else {
               flipRedEnemy(e);
+              registerKill();
             }
             player.vx = player.x + player.w / 2 < e.x + e.w / 2 ? -S.redBounceBack : S.redBounceBack;
             player.knockbackTimer = 12;
@@ -817,6 +827,9 @@ function updatePlayer() {
       }
     }
   }
+
+  // fall off screen = die (not in water)
+  if (!player.inWater && player.y > GROUND_Y + 200 && !death.active) hurtPlayer();
 
   const wasOnGround = player.onGround;
   if (!(fury.active && player.dashing) && player.groundPoundWindup === 0) {

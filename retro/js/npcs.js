@@ -2,14 +2,6 @@
 let hasOrange = false;
 let edwinGaveKey = false;
 
-// Crying animation for Edwin
-const CRY_FRAMES = ['cap2','cap3','cap4','cap5','cap6','cap7','cap8','cap10'];
-let cryFrame = 0;
-let cryTimer = 0;
-let cryDone = false;
-let cryLoops = 0;
-const CRY_LOOPS = 3;
-const CRY_INTERVAL = 12;
 
 const npcs = [
   {
@@ -28,7 +20,7 @@ const npcs = [
   {
     name: 'Edwin',
     id: 'edwin',
-    sprite: 'capy2',
+    sprite: 'cap2',
     x: 1560, w: 43, h: 44,
     flipX: true,
     get y() { return GROUND_Y - this.h; },
@@ -87,33 +79,20 @@ const poolFish = Array.from({ length: 5 }, (_, i) => ({
 }));
 
 function tickNpcs() {
-  const edwinCrying = hasOrange && !edwinGaveKey &&
-    dialog.active && dialog.npc && dialog.npc.id === 'edwin' && dialog.page >= 5;
-  if (edwinCrying) {
-    if (!cryDone) {
-      cryTimer++;
-      if (cryTimer >= CRY_INTERVAL) {
-        cryTimer = 0;
-        cryFrame++;
-        if (cryFrame >= CRY_FRAMES.length) {
-          cryLoops++;
-          if (cryLoops >= CRY_LOOPS) {
-            cryFrame = CRY_FRAMES.length - 1;
-            cryDone = true;
-          } else {
-            cryFrame = 0;
-          }
-        }
-      }
-    }
-  } else {
-    cryFrame = 0; cryTimer = 0; cryDone = false; cryLoops = 0;
+  if (hasOrange && !edwinGaveKey && dialog.active && dialog.npc && dialog.npc.id === 'edwin') {
+    const edwin = npcs.find(n => n.id === 'edwin');
+    if (edwin) edwin.sprite = dialog.page >= 6 ? 'cap10' : 'cap2';
   }
 }
 
 function nearNpc() {
   const playerCx = player.x + player.w / 2;
-  return npcs.find(n => Math.abs(playerCx - (n.x + n.w / 2)) < TALK_DISTANCE) || null;
+  const playerBy = player.y + player.h;
+  return npcs.find(n => {
+    const hClose = Math.abs(playerCx - (n.x + n.w / 2)) < TALK_DISTANCE;
+    const vClose = playerBy > n.y && playerBy < n.y + n.h + 30;
+    return hClose && vClose;
+  }) || null;
 }
 
 function onDialogClose(npc) {
@@ -168,9 +147,7 @@ function drawNpcs() {
 
   const playerCx = player.x + player.w / 2;
   for (const npc of npcs) {
-    const edwinCrying = npc.id === 'edwin' && hasOrange && !edwinGaveKey &&
-      dialog.active && dialog.npc === npc && dialog.page >= 5;
-    const sprKey = edwinCrying ? CRY_FRAMES[cryFrame] : npc.sprite;
+    const sprKey = npc.sprite;
     if (!sprites[sprKey] || !sprites[sprKey].naturalWidth) continue;
     const sx = Math.round(npc.x - cameraX);
     const sy = Math.round(npc.y - cameraY);
@@ -185,7 +162,8 @@ function drawNpcs() {
     }
     ctx.restore();
 
-    const nearby = Math.abs(playerCx - (npc.x + npc.w / 2)) < TALK_DISTANCE;
+    const playerBy = player.y + player.h;
+    const nearby = Math.abs(playerCx - (npc.x + npc.w / 2)) < TALK_DISTANCE && playerBy > npc.y && playerBy < npc.y + npc.h + 30;
     if (nearby && !dialog.active) {
       ctx.font = PIXEL_FONT_SM;
       ctx.textAlign = 'center';

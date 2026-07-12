@@ -1,4 +1,11 @@
-// Collectible items: orange + golden key
+// Collectible items: orange + golden key + coins
+
+const COIN_Y_WATER = WATER_ZONE.y - 90;
+// groups of 10 coins spaced 18px apart, placed above the water
+const _coinGroups = [1760, 2100, 2460, 2820, 3180, 3540];
+const coins = _coinGroups.flatMap(startX =>
+  Array.from({ length: 10 }, (_, i) => ({ x: startX + i * 18, y: COIN_Y_WATER }))
+).map(c => ({ ...c, w: 8, h: 10, collected: false, bobPhase: Math.random() * Math.PI * 2 }));
 
 const orange = {
   x: WATER_ZONE_2.x + WATER_ZONE_2.w / 2 - 6,
@@ -23,9 +30,9 @@ let levelCompleteTimer = 0;
 function spawnGoldenKey() {
   goldenKey.active = true;
   goldenKey.collected = false;
-  // spawns near Edwin on the first island
-  goldenKey.x = 1640;
-  goldenKey.y = GROUND_Y - 20;
+  // spawns above Edwin's head
+  goldenKey.x = 1560 + 43 / 2 - goldenKey.w / 2;
+  goldenKey.y = GROUND_Y - 44 - 30;
 }
 
 function updateItems() {
@@ -36,6 +43,18 @@ function updateItems() {
 
   const pcx = player.x + player.w / 2;
   const pcy = player.y + player.h / 2;
+
+  // Coins
+  for (const c of coins) {
+    if (c.collected) continue;
+    c.bobPhase += 0.07;
+    const cx = c.x + c.w / 2;
+    const cy = c.y + c.h / 2 + Math.sin(c.bobPhase) * 2;
+    if (Math.abs(pcx - cx) < player.w / 2 + c.w / 2 + 2 &&
+        Math.abs(pcy - cy) < player.h / 2 + c.h / 2 + 2) {
+      c.collected = true;
+    }
+  }
 
   // Orange pick-up
   if (!orange.collected) {
@@ -62,6 +81,35 @@ function updateItems() {
       levelCompleteTimer = 0;
     }
   }
+}
+
+function drawCoins() {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  for (const c of coins) {
+    if (c.collected) continue;
+    const sx = Math.round(c.x - cameraX);
+    const sy = Math.round(c.y - cameraY + Math.sin(c.bobPhase) * 2);
+    if (sx + c.w < 0 || sx > VIEW_W) continue;
+    // coin body
+    ctx.fillStyle = '#ffd700';
+    ctx.fillRect(sx + 2, sy,     4, 1);
+    ctx.fillRect(sx + 1, sy + 1, 6, 1);
+    ctx.fillRect(sx,     sy + 2, 8, 5);
+    ctx.fillRect(sx + 1, sy + 7, 6, 1);
+    ctx.fillRect(sx + 2, sy + 8, 4, 1);
+    // highlight
+    ctx.fillStyle = '#ffe866';
+    ctx.fillRect(sx + 2, sy + 1, 2, 3);
+    // shade
+    ctx.fillStyle = '#cc9900';
+    ctx.fillRect(sx + 5, sy + 3, 2, 4);
+    ctx.fillRect(sx + 4, sy + 6, 2, 2);
+    // inner detail line
+    ctx.fillStyle = '#b8860b';
+    ctx.fillRect(sx + 3, sy + 2, 1, 5);
+  }
+  ctx.restore();
 }
 
 function drawOrange() {

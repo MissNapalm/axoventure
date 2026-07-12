@@ -57,6 +57,8 @@ const platforms = [
   { x: 2580, y: 520 + WORLD_OFFSET_Y, w: 100, h: 8,  color: '#1e2a3a', oneWay: true },
   { x: 2760, y: 590 + WORLD_OFFSET_Y, w: 110, h: 8,  color: '#1e2a3a', oneWay: true },
   { x: 2940, y: 540 + WORLD_OFFSET_Y, w: 90,  h: 8,  color: '#1e2a3a', oneWay: true },
+  // left wall closing the water zone
+  { x: WATER_ZONE.x - 40, y: WATER_ZONE.y, w: 40, h: WATER_ZONE.h + 80, color: '#1a1a2e' },
   // right wall closing the water zone
   { x: WATER_ZONE.x + WATER_ZONE.w, y: WATER_ZONE.y, w: 40, h: WATER_ZONE.h + 80, color: '#1a1a2e' },
 

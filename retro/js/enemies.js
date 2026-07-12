@@ -84,7 +84,7 @@ const redEnemies = [
 
 // called from player.js when homing into a red enemy
 function flipRedEnemy(e) {
-  playSound('redguyflip');
+  playSound('enemyflipover');
   e.flipping = true;
   e.flipped = false;
   e._y = e.y;
@@ -140,19 +140,18 @@ function updateRedEnemies() {
       const xOff = player.facingLeft ? S.carryOffsetL : S.carryOffsetR;
       const jumpXOff = player.onGround ? 0 : (player.facingLeft ? S.carryJumpXL : S.carryJumpXR);
       e.x = player.x + player.w / 2 - e.w / 2 + xOff + jumpXOff;
-      // die if dragged into water
-      const ecx = e.x + e.w / 2, ecy = e.y + e.h / 2;
-      const inWater1 = ecx >= WATER_ZONE.x && ecx <= WATER_ZONE.x + WATER_ZONE.w && ecy >= WATER_ZONE.y && ecy <= WATER_ZONE.y + WATER_ZONE.h;
-      const inWater2 = ecx >= WATER_ZONE_2.x && ecx <= WATER_ZONE_2.x + WATER_ZONE_2.w && ecy >= WATER_ZONE_2.y && ecy <= WATER_ZONE_2.y + WATER_ZONE_2.h;
-      if (inWater1 || inWater2) {
-        e.dead = true; spawnDeathStars(e);
+      // die if touching the water kill wall (just before water zone x)
+      const WATER_KILL_X = WATER_ZONE.x - 10;
+      if (e.x + e.w >= WATER_KILL_X && e.x < WATER_ZONE.x + WATER_ZONE.w) {
+        e.dead = true; spawnMarioDeathArc(e);
         player.carrying = null;
-        registerKill();
+        playSound('throwkill'); player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e.y - 12 };
+        registerKill(true);
         continue;
       }
-      // touching a normal enemy while carried kills both
-      for (const ne of enemies) {
-        if (ne.dead) continue;
+      // touching any enemy while carried kills both
+      for (const ne of [...enemies, ...redEnemies]) {
+        if (ne === e || ne.dead || ne.carried) continue;
         const ox = Math.min(e.x + e.w, ne.x + ne.w) - Math.max(e.x, ne.x);
         const oy = Math.min(e.y + e.h, ne.y + ne.h) - Math.max(e.y, ne.y);
         if (ox > 0 && oy > 0) {
@@ -161,8 +160,8 @@ function updateRedEnemies() {
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
           player.carrying = null;
-          player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e.y - 12 };
-          registerKill();
+          playSound('throwkill'); player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e.y - 12 };
+          registerKill(true);
           break;
         }
       }
@@ -232,8 +231,8 @@ function updateRedEnemies() {
           spawnMarioDeathArc(e);  e.dead  = true;
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
-          player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
-          registerKill(); registerKill();
+          playSound('throwkill'); player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
+          registerKill(true); registerKill(true);
           break;
         }
       }
@@ -249,8 +248,8 @@ function updateRedEnemies() {
           spawnMarioDeathArc(e);  e.dead  = true;
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
-          player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
-          registerKill(); registerKill();
+          playSound('throwkill'); player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
+          registerKill(true); registerKill(true);
           break;
         }
       }
@@ -292,6 +291,22 @@ function updateRedEnemies() {
     }
 
     if (e.flipped) {
+      // kill any enemy that touches a flipped enemy
+      for (const ne of [...enemies, ...redEnemies]) {
+        if (ne === e || ne.dead || ne.carried || ne.flipped || ne.flipping || ne.thrown) continue;
+        const ox = Math.min(e.x + e.w, ne.x + ne.w) - Math.max(e.x, ne.x);
+        const oy = Math.min(e.y + e.h, ne.y + ne.h) - Math.max(e.y, ne.y);
+        if (ox > 0 && oy > 0) {
+          spawnMarioDeathArc(ne); ne.dead = true;
+          spawnMarioDeathArc(e);  e.dead = true;
+          triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
+          screenShakeTimer = 6;
+          playSound('throwkill'); player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e.y - 12 };
+          registerKill(true);
+          break;
+        }
+      }
+      if (e.dead) continue;
       e.flippedTimer++;
       if (e.flippedTimer >= 180) {
         e.platformY = e._y + e.h; // stand up on whatever surface it's resting on
@@ -674,8 +689,8 @@ function updateFury() {
   }
 }
 
-function registerKill() {
-  playSound('die');
+function registerKill(silent) {
+  if (!silent) playSound('die');
   combo.count++;
   combo.timer = combo.WINDOW;
   combo.displayTimer = 0;
@@ -835,7 +850,7 @@ function updateBigFish() {
       // aggro if player stays close for 3 seconds (180 frames)
       if (player.inWater && dist < PATROL_TRIGGER_DIST) {
         e.proximityTimer++;
-        if (e.proximityTimer >= 180) {
+        if (e.proximityTimer >= 60) {
           e.proximityTimer = 0;
           e.state = 'windup';
           e.stateTimer = WINDUP_FRAMES;
@@ -1178,6 +1193,32 @@ function updateEnemies() {
       e._y = player.y - e.h + S.blueCarryOffset + (!player.onGround ? (player.facingLeft ? S.carryJumpYL : S.carryJumpYR) : 0);
       e.frameTimer++;
       if (e.frameTimer >= 10) { e.frameTimer = 0; e.frame = (e.frame + 1) % 2; }
+      // die if touching the water kill wall
+      if (e.x + e.w >= WATER_ZONE.x - 10 && e.x < WATER_ZONE.x + WATER_ZONE.w) {
+        e.dead = true; spawnMarioDeathArc(e);
+        player.carrying = null;
+        playSound('throwkill'); player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
+        registerKill(true);
+        continue;
+      }
+      // kill any enemy the player walks into while carrying
+      for (const ne of [...enemies, ...redEnemies]) {
+        if (ne === e || ne.dead || ne.carried) continue;
+        const ney = (ne.flipped || ne.thrown || ne.flipping) ? ne._y : ne.y;
+        const ox = Math.min(player.x + player.w, ne.x + ne.w) - Math.max(player.x, ne.x);
+        const oy = Math.min(player.y + player.h, ney + ne.h) - Math.max(player.y, ney);
+        if (ox > 0 && oy > 0) {
+          spawnMarioDeathArc(ne); ne.dead = true;
+          spawnMarioDeathArc(e);  e.dead = true;
+          player.carrying = null;
+          triggerLightning(Math.round(ne.x + ne.w / 2 - cameraX));
+          screenShakeTimer = 6;
+          playSound('throwkill'); player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: ne.x + ne.w / 2, y: ney - 12 };
+          registerKill(true);
+          break;
+        }
+      }
+      if (e.dead) continue;
       continue;
     }
 
@@ -1207,8 +1248,8 @@ function updateEnemies() {
           spawnMarioDeathArc(e);  e.dead  = true;
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
-          player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
-          registerKill(); registerKill();
+          playSound('throwkill'); player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
+          registerKill(true); registerKill(true);
           break;
         }
       }
@@ -1223,8 +1264,8 @@ function updateEnemies() {
           spawnMarioDeathArc(e);  e.dead  = true;
           triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
           screenShakeTimer = 6;
-          player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
-          registerKill(); registerKill();
+          playSound('throwkill'); player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
+          registerKill(true); registerKill(true);
           break;
         }
       }
@@ -1256,6 +1297,23 @@ function updateEnemies() {
         const _hw2 = _fr > WATER_ZONE_2.x && _fl < WATER_ZONE_2.x + WATER_ZONE_2.w;
         if (_hw1 || _hw2) { e.dead = true; spawnDeathStars(e); if (player.carrying === e) player.carrying = null; registerKill(); continue; }
       }
+      // kill any enemy that walks into a flipped blue enemy
+      for (const ne of [...enemies, ...redEnemies]) {
+        if (ne === e || ne.dead || ne.carried || ne.flipped || ne.flipping || ne.thrown) continue;
+        const nex = ne.x, ney = (ne.flipped || ne.thrown || ne.flipping) ? ne._y : ne.y;
+        const ox = Math.min(e.x + e.w, nex + ne.w) - Math.max(e.x, nex);
+        const oy = Math.min(e._y + e.h, ney + ne.h) - Math.max(e._y, ney);
+        if (ox > 0 && oy > 0) {
+          spawnMarioDeathArc(ne); ne.dead = true;
+          spawnMarioDeathArc(e);  e.dead = true;
+          triggerLightning(Math.round(e.x + e.w / 2 - cameraX));
+          screenShakeTimer = 6;
+          playSound('throwkill'); player.killText = { text: 'THROW HIT!', timer: 50, maxTimer: 50, x: e.x + e.w / 2, y: e._y - 12 };
+          registerKill(true);
+          break;
+        }
+      }
+      if (e.dead) continue;
       e.flippedTimer++;
       // gravity + platform/ground landing — clamp to downward only so bounce setting can't push upward
       e.vy += S.redFlipGrav;
